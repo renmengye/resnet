@@ -3,17 +3,18 @@
 Author: Mengye Ren (mren@cs.toronto.edu)
 
 Usage:
-python run_cifar_exp.py    --model           [MODEL NAME]        \
-                           --config          [CONFIG FILE]       \
-                           --env             [ENV FILE]          \
-                           --dataset         [DATASET]           \
-                           --data_folder     [DATASET FOLDER]    \
-                           --validation                          \
-                           --valid_fold_id   [0-9]               \
-                           --no_validation                       \
-                           --logs            [LOGS FOLDER]       \
-                           --results         [SAVE FOLDER]       \
-                           --gpu             [GPU ID]            \
+python run_cifar_exp.py    --model           [MODEL NAME]          \
+                           --config          [CONFIG FILE]         \
+                           --env             [ENV FILE]            \
+                           --dataset         [DATASET]             \
+                           --data_folder     [DATASET FOLDER]      \
+                           --validation                            \
+                           --valid_fold_id   [0..VALID NUM FOLD-1] \
+                           --valid_num_fold  [VALID NUM FOLD]      \
+                           --no_validation                         \
+                           --logs            [LOGS FOLDER]         \
+                           --results         [SAVE FOLDER]         \
+                           --gpu             [GPU ID]              \
                            --verbose
 
 Flags:
@@ -23,6 +24,8 @@ Flags:
   --dataset: Dataset name. Available options are: 1) cifar-10 2) cifar-100.
   --data_folder: Path to data folder, default is data/{DATASET}.
   --validation: Evaluating experiments on validation set.
+  --valid_fold_id: K-fold validation fold ID, 0..valid_num_fold.
+  --valid_num_fold: K-fold validation number of fold.
   --no_validation: Evaluating experiments on test set.
   --logs: Path to logs folder, default is logs/default.
   --results: Path to save folder, default is results.
