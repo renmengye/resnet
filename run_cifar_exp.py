@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-Authors: Mengye Ren (mren@cs.toronto.edu)
+Author: Mengye Ren (mren@cs.toronto.edu)
 
 Usage:
 python run_cifar_exp.py    --model           [MODEL NAME]        \
@@ -17,15 +17,15 @@ python run_cifar_exp.py    --model           [MODEL NAME]        \
                            --verbose
 
 Flags:
-  --model: Model type. See resnet/configs/cifar_exp_config.py
+  --model: See resnet/configs/cifar_exp_config.py. Default resnet-32.
   --config: Not using the pre-defined configs above, specify the JSON file
   that contains model configurations.
   --dataset: Dataset name. Available options are: 1) cifar-10 2) cifar-100.
-  --data_folder: Path to data folder, default is ../data/{DATASET}.
+  --data_folder: Path to data folder, default is data/{DATASET}.
   --validation: Evaluating experiments on validation set.
   --no_validation: Evaluating experiments on test set.
-  --logs: Path to logs folder, default is ../logs/default.
-  --results: Path to save folder, default is ../results.
+  --logs: Path to logs folder, default is logs/default.
+  --results: Path to save folder, default is results.
   --gpu: Which GPU to run, default is 0, -1 for CPU.
   --verbose: Verbose logging training errors.
 """
