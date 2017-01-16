@@ -17,7 +17,7 @@ python run_cifar_exp.py    --model           [MODEL NAME]        \
                            --verbose
 
 Flags:
-  --model: Model type. See resnet/configs/cifar_exp_configs.py
+  --model: Model type. See resnet/configs/cifar_exp_config.py
   --config: Not using the pre-defined configs above, specify the JSON file
   that contains model configurations.
   --dataset: Dataset name. Available options are: 1) cifar-10 2) cifar-100.
@@ -314,18 +314,12 @@ def train_model(config, environ, train_data, test_data, trainval_data=None):
     with tf.name_scope("Train"):
       with tf.variable_scope("Model", reuse=None):
         with tf.device(environ.device):
-          if config.model.startswith("resnet"):
-            m = ResNetModel(config, is_training=True)
-          else:
-            m = CNNModel(config, is_training=True)
+          m = ResNetModel(config, is_training=True)
 
     with tf.name_scope("Valid"):
       with tf.variable_scope("Model", reuse=True):
         with tf.device(environ.device):
-          if config.model.startswith("resnet"):
-            mvalid = ResNetModel(config, is_training=False)
-          else:
-            mvalid = CNNModel(config, is_training=False)
+          mvalid = ResNetModel(config, is_training=False)
 
     # Initializes variables.
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
