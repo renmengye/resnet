@@ -5,5 +5,4 @@ mkdir -p data
 ln -s $DATA_STORAGE/cifar-10 data/cifar-10
 ln -s $DATA_STORAGE/cifar-100 data/cifar-100
 mkdir -p logs/default
-mkdir -p $RESULTS_STORAGE
 ln -s $RESULTS_STORAGE results
