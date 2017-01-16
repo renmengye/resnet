@@ -10,10 +10,10 @@ Usage:
 from __future__ import division
 
 import numpy as np
-import progress_bar as pb
-import logger
 import threading
 
+from resnet.utils import logger
+from resnet.utils import progress_bar as pb
 
 class IBatchIterator(object):
 
