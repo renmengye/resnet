@@ -7,13 +7,15 @@ Usage:
         labels_batch = labels_all[idx]
         train(inp_batch, labels_batch)
 """
-from __future__ import division
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 import numpy as np
 import threading
 
 from resnet.utils import logger
 from resnet.utils import progress_bar as pb
+
 
 class IBatchIterator(object):
 
@@ -26,13 +28,21 @@ class IBatchIterator(object):
 
   def reset(self):
     raise Exception('Not implemented')
+
   pass
 
 
 class BatchIterator(IBatchIterator):
 
-  def __init__(self, num, batch_size=1, progress_bar=False, log_epoch=10,
-               get_fn=None, cycle=False, shuffle=True, stagnant=False,
+  def __init__(self,
+               num,
+               batch_size=1,
+               progress_bar=False,
+               log_epoch=10,
+               get_fn=None,
+               cycle=False,
+               shuffle=True,
+               stagnant=False,
                seed=2):
     """Construct a batch iterator.
 
@@ -85,6 +95,7 @@ class BatchIterator(IBatchIterator):
 
     def get_fn(idx):
       return self._get_fn(idx, variables=variables)
+
     self.get_fn = get_fn
     return self
 
@@ -98,10 +109,9 @@ class BatchIterator(IBatchIterator):
     p = a / b * 100
     digit = int(np.ceil(np.log10(b)))
     progress_str = '{:' + str(digit) + 'd}'
-    progress_str = (progress_str + '/' +
-                    progress_str).format(int(a), int(b))
-    self._log.info(
-        'Epoch {:3d} Progress {} ({:5.2f}%)'.format(e, progress_str, p))
+    progress_str = (progress_str + '/' + progress_str).format(int(a), int(b))
+    self._log.info('Epoch {:3d} Progress {} ({:5.2f}%)'.format(e, progress_str,
+                                                               p))
     pass
 
   def next(self):
@@ -169,9 +179,15 @@ class BatchIterator(IBatchIterator):
         return idx
     pass
 
+
 if __name__ == '__main__':
-  b = BatchIterator(400, batch_size=32, progress_bar=False,
-                    get_fn=lambda x: x, cycle=False, shuffle=False)
+  b = BatchIterator(
+      400,
+      batch_size=32,
+      progress_bar=False,
+      get_fn=lambda x: x,
+      cycle=False,
+      shuffle=False)
   for ii in b:
     print ii
   b.reset()

@@ -8,15 +8,16 @@ Usage:
 
     import logger
     log = logger.get('../logs/sample_log')
-    
+
     log.info('Hello world!')
     log.info('Hello again!', verbose=2)
     log.warning('Something might be wrong.')
     log.error('Something is wrong.')
     log.fatal('Failed.')
 """
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
-from __future__ import print_function
 import datetime
 import inspect
 import os
@@ -79,8 +80,7 @@ class Logger(object):
       if not os.path.exists(dirname):
         os.makedirs(dirname)
       open(self.filename, 'w').close()
-      self.info('Log written to {}'.format(
-          os.path.abspath(self.filename)))
+      self.info('Log written to {}'.format(os.path.abspath(self.filename)))
     else:
       self.filename = None
 
@@ -119,24 +119,24 @@ class Logger(object):
     """
     threadstr = '{}'.format(threading.current_thread().ident)[-4:]
     if typ == 'info':
-      typstr_print = '{}I{}{}'.format(
-          TERM_COLOR['green'], threadstr, TERM_COLOR['default'])
+      typstr_print = '{}I{}{}'.format(TERM_COLOR['green'], threadstr,
+                                      TERM_COLOR['default'])
       typstr_log = 'I{}'.format(threadstr)
     elif typ == 'warning':
-      typstr_print = '{}W{}{}'.format(
-          TERM_COLOR['yellow'], threadstr, TERM_COLOR['default'])
+      typstr_print = '{}W{}{}'.format(TERM_COLOR['yellow'], threadstr,
+                                      TERM_COLOR['default'])
       typstr_log = 'W{}'.format(threadstr)
     elif typ == 'debug':
-      typstr_print = '{}D{}{}'.format(
-          TERM_COLOR['yellow'], threadstr, TERM_COLOR['default'])
+      typstr_print = '{}D{}{}'.format(TERM_COLOR['yellow'], threadstr,
+                                      TERM_COLOR['default'])
       typstr_log = 'D{}'.format(threadstr)
     elif typ == 'error':
-      typstr_print = '{}E{}{}'.format(
-          TERM_COLOR['red'], threadstr, TERM_COLOR['default'])
+      typstr_print = '{}E{}{}'.format(TERM_COLOR['red'], threadstr,
+                                      TERM_COLOR['default'])
       typstr_log = 'E{}'.format(threadstr)
     elif typ == 'fatal':
-      typstr_print = '{}F{}{}'.format(
-          TERM_COLOR['red'], threadstr, TERM_COLOR['default'])
+      typstr_print = '{}F{}{}'.format(TERM_COLOR['red'], threadstr,
+                                      TERM_COLOR['default'])
       typstr_log = 'F{}'.format(threadstr)
     else:
       raise Exception('Unknown log type: {0}'.format(typ))
@@ -154,10 +154,8 @@ class Logger(object):
     callerstr = '{}:{}'.format(filename, line_number)
     if len(callerstr) > 20:
       callerstr = '...{}'.format(callerstr[-17:])
-    printstr = '{} {} {} {}'.format(
-        typstr_print, timestr, callerstr, message)
-    logstr = '{} {} {} {}'.format(
-        typstr_log, timestr, callerstr, message)
+    printstr = '{} {} {} {}'.format(typstr_print, timestr, callerstr, message)
+    logstr = '{} {} {} {}'.format(typstr_log, timestr, callerstr, message)
 
     if verbose is None:
       verbose = self.default_verbose
