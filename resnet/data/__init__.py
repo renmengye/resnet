@@ -1,1 +1,1 @@
-from cifar import CIFAR10Dataset, CIFAR100Dataset
+from get_dataset import get_dataset

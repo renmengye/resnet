@@ -1,6 +1,12 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
-import Queue
+import sys
+
+is_py2 = sys.version[0] == '2'
+if is_py2:
+    import Queue as queue
+else:
+    import queue as queue
 import threading
 
 from resnet.utils import logger
@@ -56,7 +62,7 @@ class BatchConsumer(threading.Thread):
       try:
         self.q.get(False)
         self.q.task_done()
-      except Queue.Empty:
+      except queue.Empty:
         pass
     pass
 
@@ -77,7 +83,7 @@ class ConcurrentBatchIterator(IBatchIterator):
     super(ConcurrentBatchIterator, self).__init__()
     self.max_queue_size = max_queue_size
     self.num_threads = num_threads
-    self.q = Queue.Queue(maxsize=max_queue_size)
+    self.q = queue.Queue(maxsize=max_queue_size)
     self.log = logger.get()
     self.batch_iter = batch_iter
     self.fetchers = []
@@ -87,6 +93,9 @@ class ConcurrentBatchIterator(IBatchIterator):
     self.log_queue = log_queue
     self.name = name
     pass
+
+  def __len__(self):
+    return len(self.batch_iter)
 
   def init_fetchers(self):
     for ii in xrange(self.num_threads):
@@ -146,7 +155,7 @@ class ConcurrentBatchIterator(IBatchIterator):
         batch = self.q.get(False)
         self.q.task_done()
         qempty = False
-      except Queue.Empty:
+      except queue.Empty:
         qempty = True
         pass
 

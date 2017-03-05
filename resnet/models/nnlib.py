@@ -62,7 +62,7 @@ def weight_variable(shape,
         uniform=False, seed=1, dtype=dtype)
   else:
     raise ValueError("Non supported initialization method!")
-  log.info("Weight shape {}".format(shape))
+  log.info("Weight shape {}".format([int(ss) for ss in shape]))
   if wd is not None:
     if wd > 0.0:
       reg = lambda x: tf.mul(tf.nn.l2_loss(x), wd)

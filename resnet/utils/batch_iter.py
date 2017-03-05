@@ -7,14 +7,11 @@ Usage:
         labels_batch = labels_all[idx]
         train(inp_batch, labels_batch)
 """
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+from __future__ import division
 
 import numpy as np
+import logger
 import threading
-
-from resnet.utils import logger
-from resnet.utils import progress_bar as pb
 
 
 class IBatchIterator(object):
@@ -24,10 +21,10 @@ class IBatchIterator(object):
     return self
 
   def next(self):
-    raise Exception('Not implemented')
+    raise Exception("Not implemented")
 
   def reset(self):
-    raise Exception('Not implemented')
+    raise Exception("Not implemented")
 
   pass
 
@@ -43,7 +40,8 @@ class BatchIterator(IBatchIterator):
                cycle=False,
                shuffle=True,
                stagnant=False,
-               seed=2):
+               seed=2,
+               num_batches=-1):
     """Construct a batch iterator.
 
     Args:
@@ -57,6 +55,8 @@ class BatchIterator(IBatchIterator):
     self._batch_size = batch_size
     self._step = 0
     self._num_steps = int(np.ceil(self._num / float(batch_size)))
+    if num_batches > 0:
+      self._num_steps = min(self._num_steps, num_batches)
     self._pb = None
     self._variables = None
     self._get_fn = get_fn
@@ -108,9 +108,9 @@ class BatchIterator(IBatchIterator):
     b = self._num
     p = a / b * 100
     digit = int(np.ceil(np.log10(b)))
-    progress_str = '{:' + str(digit) + 'd}'
-    progress_str = (progress_str + '/' + progress_str).format(int(a), int(b))
-    self._log.info('Epoch {:3d} Progress {} ({:5.2f}%)'.format(e, progress_str,
+    progress_str = "{:" + str(digit) + "d}"
+    progress_str = (progress_str + "/" + progress_str).format(int(a), int(b))
+    self._log.info("Epoch {:3d} Progress {} ({:5.2f}%)".format(e, progress_str,
                                                                p))
     pass
 
@@ -154,7 +154,7 @@ class BatchIterator(IBatchIterator):
     if not self._cycle:
       end = min(self._num, end)
       idx = np.arange(start, end)
-      idx = idx.astype('int')
+      idx = idx.astype("int")
       if self.get_fn is not None:
         return self.get_fn(idx)
       else:
@@ -164,11 +164,11 @@ class BatchIterator(IBatchIterator):
       end = end % self._num
       if end > start:
         idx = np.arange(start, end)
-        idx = idx.astype('int')
+        idx = idx.astype("int")
         idx = self._shuffle_idx[idx]
       else:
         idx = np.array(range(start, self._num) + range(0, end))
-        idx = idx.astype('int')
+        idx = idx.astype("int")
         idx = self._shuffle_idx[idx]
         # Shuffle every cycle.
         if self._shuffle:
@@ -180,7 +180,7 @@ class BatchIterator(IBatchIterator):
     pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   b = BatchIterator(
       400,
       batch_size=32,

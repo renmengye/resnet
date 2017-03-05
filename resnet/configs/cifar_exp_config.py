@@ -62,31 +62,7 @@ class ResNet32Config(object):
     self.data_aug = True
     self.whiten = False  # Original TF has whiten.
     self.div255 = True
-
-  def set_name(self, model):
-    self.model = model
-    return self
-
-  def set_l1_reg(self, val):
-    self.l1_reg = val
-    return self
-
-  def set_wd(self, val):
-    self.wd = val
-    return self
-
-  def set_sigma_init(self, val):
-    self.sigma_init = val
-    return self
-
-  def set_max_train_iter(self, val):
-    self.max_train_iter = val
-    return self
-
-  def set_lr_decay_steps(self, val):
-    self.lr_decay_steps = val
-    return self
-
+    
   def to_json(self):
     return json.dumps(self, default=lambda o: o.__dict__)
 

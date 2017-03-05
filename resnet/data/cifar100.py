@@ -1,10 +1,10 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from data import cifar_input
 import numpy as np
 import tensorflow as tf
 
+from resnet.data import cifar_input
 
 class CIFAR100Dataset():
 

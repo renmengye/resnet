@@ -1,8 +1,8 @@
-RESULTS_STORAGE=/ais/gobi4/$USER/results
-DATA_STORAGE=/ais/gobi4/mren/data
-#DATA_STORAGE=/home/mren/data
 mkdir -p data
-ln -s $DATA_STORAGE/cifar-10 data/cifar-10
-ln -s $DATA_STORAGE/cifar-100 data/cifar-100
+ln -s /ais/gobi4/mren/data/cifar-10 data/cifar-10
+ln -s /ais/gobi4/mren/data/cifar-100 data/cifar-100
+ln -s /ais/gobi4/mren/data/imagenet data/imagenet
 mkdir -p logs/default
-ln -s $RESULTS_STORAGE results
+ln -s /u/$USER/public_html/results logs/public
+mkdir -p /ais/gobi4/mren/$USER/results/div_norm
+ln -s /ais/gobi4/$USER/results/div_norm results
