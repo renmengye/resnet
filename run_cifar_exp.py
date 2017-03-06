@@ -28,11 +28,8 @@ Flags:
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import datetime
-import json
 import numpy as np
 import os
-import sys
 import tensorflow as tf
 
 from tqdm import tqdm
@@ -40,7 +37,7 @@ from tqdm import tqdm
 from resnet.configs import cifar_exp_config as conf
 from resnet.data import get_dataset
 from resnet.models import ResNetModel
-from resnet.utils import ExperimentLogger
+from resnet.utils import ExperimentLogger, FixedLearnRateScheduler
 from resnet.utils import logger, gen_id
 
 log = logger.get()
@@ -49,8 +46,8 @@ flags = tf.flags
 flags.DEFINE_string("config", None, "Manually defined config file.")
 flags.DEFINE_string("dataset", "cifar-10", "Dataset name.")
 flags.DEFINE_string("id", None, "Experiment ID.")
-flags.DEFINE_string("results", "results/cifar", "Saving folder.")
-flags.DEFINE_string("logs", "logs/default", "Logging folder.")
+flags.DEFINE_string("results", "./results/cifar", "Saving folder.")
+flags.DEFINE_string("logs", "./logs/public", "Logging folder.")
 flags.DEFINE_string("model", "resnet-32", "Model type.")
 flags.DEFINE_bool("validation", False, "Whether run validation set.")
 FLAGS = flags.FLAGS
@@ -98,6 +95,19 @@ def save(sess, saver, global_step, config, save_folder):
       sess, os.path.join(save_folder, "model.ckpt"), global_step=global_step)
 
 
+def get_models(config):
+  # Builds models.
+  log.info("Building models")
+  with tf.name_scope("Train"):
+    with tf.variable_scope("Model", reuse=None):
+      m = ResNetModel(config, is_training=True)
+
+  with tf.name_scope("Valid"):
+    with tf.variable_scope("Model", reuse=True):
+      mvalid = ResNetModel(config, is_training=False)
+  return m, mvalid
+
+
 def train_model(exp_id,
                 config,
                 train_iter,
@@ -116,66 +126,49 @@ def train_model(exp_id,
   Returns:
       acc: Final test accuracy
   """
-  np.random.seed(0)
-  if not hasattr(config, "seed"):
-    tf.set_random_seed(1234)
-    log.info("Setting tensorflow random seed={:d}".format(1234))
-  else:
-    log.info("Setting tensorflow random seed={:d}".format(config.seed))
-    tf.set_random_seed(config.seed)
-
   log.info("Config: {}".format(config.__dict__))
-  if save_folder is not None:
-    save_folder = os.path.join(save_folder, exp_id)
-  if logs_folder is not None:
-    logs_folder = os.path.join(logs_folder, exp_id)
   exp_logger = ExperimentLogger(logs_folder)
 
-  # Builds models.
-  log.info("Building models")
-  with tf.name_scope("Train"):
-    with tf.variable_scope("Model", reuse=None):
-      m = ResNetModel(config, is_training=True)
-
-  with tf.name_scope("Valid"):
-    with tf.variable_scope("Model", reuse=True):
-      mvalid = ResNetModel(config, is_training=False)
-
   # Initializes variables.
-  with tf.Session() as sess:
-    saver = tf.train.Saver()
-    sess.run(tf.global_variables_initializer())
-    lr = config.base_learn_rate
-    lr_decay_steps = config.lr_decay_steps
-    max_train_iter = config.max_train_iter
-    m.assign_lr(sess, lr)
-    for niter in tqdm(range(max_train_iter)):
-      # Decrease learning rate.
-      if len(lr_decay_steps) > 0:
-        if (niter + 1) == lr_decay_steps[0]:
-          lr *= 0.1
-          m.assign_lr(sess, lr)
-          lr_decay_steps.pop(0)
+  with tf.Graph().as_default():
+    np.random.seed(0)
+    if not hasattr(config, "seed"):
+      tf.set_random_seed(1234)
+      log.info("Setting tensorflow random seed={:d}".format(1234))
+    else:
+      log.info("Setting tensorflow random seed={:d}".format(config.seed))
+      tf.set_random_seed(config.seed)
+    m, mvalid = get_models(config)
 
-      ce = train_step(sess, m, train_iter.next())
+    with tf.Session() as sess:
+      saver = tf.train.Saver()
+      sess.run(tf.global_variables_initializer())
 
-      if (niter + 1) % config.disp_iter == 0 or niter == 0:
-        exp_logger.log_train_ce(niter, ce)
+      # Set up learning rate schedule.
+      lr = config.base_learn_rate
+      lr_scheduler = FixedLearnRateScheduler(
+          sess, m, lr, config.lr_decay_steps, lr_list=config.lr_list)
 
-      if (niter + 1) % config.valid_iter == 0 or niter == 0:
-        if trainval_iter is not None:
-          acc = evaluate(sess, mvalid, trainval_iter)
-          exp_logger.log_train_acc(niter, acc)
-        test_iter.reset()
-        acc = evaluate(sess, mvalid, test_iter)
-        log.info("Experment ID {}".format(exp_id))
-        exp_logger.log_valid_acc(niter, acc)
+      for niter in tqdm(range(config.max_train_iter), desc=exp_id):
+        lr_scheduler.step(niter)
+        ce = train_step(sess, m, train_iter.next())
 
-      if (niter + 1) % config.save_iter == 0:
-        if save_folder is not None:
+        if (niter + 1) % config.disp_iter == 0 or niter == 0:
+          exp_logger.log_train_ce(niter, ce)
+
+        if (niter + 1) % config.valid_iter == 0 or niter == 0:
+          if trainval_iter is not None:
+            trainval_iter.reset()
+            acc = evaluate(sess, mvalid, trainval_iter)
+            exp_logger.log_train_acc(niter, acc)
+          test_iter.reset()
+          acc = evaluate(sess, mvalid, test_iter)
+          exp_logger.log_valid_acc(niter, acc)
+
+        if (niter + 1) % config.save_iter == 0 or niter == 0:
           save(sess, saver, m.global_step, config, save_folder)
-    test_iter.reset()
-    acc = evaluate(test_iter, -1)
+      test_iter.reset()
+      acc = evaluate(test_iter, -1)
   return acc
 
 
@@ -192,18 +185,47 @@ def main():
     test_str = "test"
 
   if FLAGS.id is None:
-    exp_id = "exp_cifar" + FLAGS.dataset + "_" + FLAGS.model
+    exp_id = "exp_" + FLAGS.dataset + "_" + FLAGS.model
     exp_id = gen_id(exp_id)
+
+  if FLAGS.results is not None:
+    save_folder = os.path.realpath(
+        os.path.abspath(os.path.join(FLAGS.results, exp_id)))
+    if not os.path.exists(save_folder):
+      os.makedirs(save_folder)
+  else:
+    save_folder = None
+
+  if FLAGS.logs is not None:
+    logs_folder = os.path.realpath(
+        os.path.abspath(os.path.join(FLAGS.logs, exp_id)))
+    if not os.path.exists(logs_folder):
+      os.makedirs(logs_folder)
+  else:
+    logs_folder = None
 
   # Configures dataset objects.
   log.info("Building dataset")
   train_data = get_dataset(FLAGS.dataset, train_str)
   trainval_data = get_dataset(
-      FLAGS.dataset, train_str, num_batches=100, cycle=False)
-  test_data = get_dataset(FLAGS.dataset, test_str, cycle=False)
+      FLAGS.dataset,
+      train_str,
+      num_batches=100,
+      data_aug=False,
+      cycle=False,
+      prefetch=False)
+  test_data = get_dataset(
+      FLAGS.dataset, test_str, data_aug=False, cycle=False, prefetch=False)
 
   # Trains a model.
-  acc = train_model(exp_id, config, train_data, test_data, trainval_data)
+  acc = train_model(
+      exp_id,
+      config,
+      train_data,
+      test_data,
+      trainval_data,
+      save_folder=save_folder,
+      logs_folder=logs_folder)
   log.info("Final test accuracy = {:.3f}".format(acc * 100))
 
 

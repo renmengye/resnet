@@ -156,7 +156,7 @@ class ResNetModel(object):
     is_training = self.is_training
     num_stages = len(self.config.num_residual_units)
     act_fn = [None] * (num_stages + 1)
-    
+
     strides = config.strides
     activate_before_residual = config.activate_before_residual
     filters = config.filters
@@ -221,24 +221,26 @@ class ResNetModel(object):
     with tf.variable_scope(name):
       n_out = x.get_shape()[-1]
       beta = nn.weight_variable(
-          [n_out], init_method="constant", init_param={"val": 0.0}, name="beta")
+          [n_out],
+          init_method="constant",
+          init_param={"val": 0.0},
+          seed=self.config.seed,
+          name="beta")
       gamma = nn.weight_variable(
           [n_out],
           init_method="constant",
           init_param={"val": 1.0},
+          seed=self.config.seed,
           name="gamma")
-      return nn.batch_norm(
+      return nn.batch_norm_new(
           x,
-          n_out,
           self.is_training,
-          reuse=None,
           gamma=gamma,
           beta=beta,
           axes=[0, 1, 2],
           eps=1e-3,
           scope="bn",
-          name="bn_out",
-          return_mean=False)
+          name="bn_out")
 
   def _residual(self,
                 x,
@@ -353,7 +355,6 @@ class ResNetModel(object):
 
   def _l1_loss(self):
     """L1 activation loss."""
-    # l1_reg_losses = tf.get_collection(L1_REG_KEY)
     if len(self.l1_collection) > 0:
       log.warning("L1 Regularizers {}".format(self.l1_collection))
       return tf.add_n(self.l1_collection)
@@ -371,6 +372,7 @@ class ResNetModel(object):
           init_param={"mean": 0,
                       "stddev": np.sqrt(2.0 / n)},
           wd=self.config.wd,
+          seed=self.config.seed,
           name="w")
       return tf.nn.conv2d(x, kernel, strides, padding="SAME")
 
@@ -387,9 +389,14 @@ class ResNetModel(object):
         init_method="uniform_scaling",
         init_param={"factor": 1.0},
         wd=self.config.wd,
+        seed=self.config.seed,
         name="w")
     b = nn.weight_variable(
-        [out_dim], init_method="constant", init_param={"val": 0.0}, name="b")
+        [out_dim],
+        init_method="constant",
+        init_param={"val": 0.0},
+        seed=self.config.seed,
+        name="b")
     return tf.nn.xw_plus_b(x, w, b)
 
   def _global_avg_pool(self, x):

@@ -6,4 +6,5 @@ rsync -rP \
 --exclude "/$NAME/logs" \
 --exclude "/$NAME/.git" \
 --exclude "/$NAME/.gitignore" \
+--exclude "*.pyc" \
 ../$NAME $USER@cs.toronto.edu:/u/$USER/$FOLDER 

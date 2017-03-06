@@ -150,17 +150,20 @@ class Logger(object):
     printstr = "{} {} {} {}".format(typstr_print, timestr, callerstr, message)
     logstr = "{} {} {} {}".format(typstr_log, timestr, callerstr, message)
 
+    print(printstr)
+    pass
+
+  def log_wrapper(self, message, typ="info", verbose=None):
     if verbose is None:
       verbose = self.default_verbose
 
     if type(verbose) != int:
       raise Exception("Unknown verbose value: {}".format(verbose))
-    # print((self.verbose_thresh, type(self.verbose_thresh), verbose, type(verbose)))
-    # print(threadstr, "Waiting log lock")
+
     log_lock.acquire()
     try:
       if self.verbose_thresh >= verbose:
-        print(printstr)
+        self.log(message, typ=typ, verbose=verbose)
 
       if self.filename is not None:
         with open(self.filename, "a") as f:
@@ -171,8 +174,6 @@ class Logger(object):
       print(str(e))
     finally:
       log_lock.release()
-    # print(threadstr, "Released log lock")
-    pass
 
   def info(self, message, verbose=None):
     """
@@ -182,7 +183,7 @@ class Logger(object):
         message: string, message content.
         verbose: number, verbose level.
     """
-    self.log(message, typ="info", verbose=verbose)
+    self.log_wrapper(message, typ="info", verbose=verbose)
     pass
 
   def warning(self, message, verbose=1):
@@ -193,7 +194,7 @@ class Logger(object):
         message: string, message content.
         verbose: number, verbose level.
     """
-    self.log(message, typ="warning", verbose=verbose)
+    self.log_wrapper(message, typ="warning", verbose=verbose)
     pass
 
   def error(self, message, verbose=0):
@@ -204,11 +205,11 @@ class Logger(object):
         message: string, message content.
         verbose: number, verbose level.
     """
-    self.log(message, typ="error", verbose=verbose)
+    self.log_wrapper(message, typ="error", verbose=verbose)
     pass
 
   def debug(self, message, verbose=None):
-    self.log(message, typ="debug", verbose=verbose)
+    self.log_wrapper(message, typ="debug", verbose=verbose)
     pass
 
   def fatal(self, message, verbose=0):
@@ -219,7 +220,7 @@ class Logger(object):
         message: string, message content.
         verbose: number, verbose level.
     """
-    self.log(message, typ="fatal", verbose=verbose)
+    self.log_wrapper(message, typ="fatal", verbose=verbose)
     sys.exit(0)
     pass
 

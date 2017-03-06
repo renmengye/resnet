@@ -2,7 +2,6 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import json
-import os
 
 
 def get_config(dataset, model):
@@ -32,7 +31,7 @@ class ResNet32Config(object):
     self.width = 32
     self.num_channel = 3
     self.min_lrn_rate = 0.0001
-    self.base_learn_rate = 0.1
+    self.base_learn_rate = 1e-1
     self.num_residual_units = [5, 5, 5]  # ResNet-32
     self.seed = 1234
     self.strides = [1, 2, 2]
@@ -48,10 +47,11 @@ class ResNet32Config(object):
     self.optimizer = "mom"
     self.max_train_iter = 80000
     self.lr_decay_steps = [40000, 60000]
+    self.lr_list = [1e-2, 1e-3]
     self.model = "resnet-32"
     self.disp_iter = 100
-    self.save_iter = 5000
-    self.valid_iter = 500
+    self.save_iter = 10000
+    self.valid_iter = 1000
     self.norm_field = None
     self.sigma_init = 1e-2
     self.learn_sigma = False
@@ -62,7 +62,8 @@ class ResNet32Config(object):
     self.data_aug = True
     self.whiten = False  # Original TF has whiten.
     self.div255 = True
-    
+    self.seed = 0
+
   def to_json(self):
     return json.dumps(self, default=lambda o: o.__dict__)
 

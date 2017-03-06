@@ -2,7 +2,7 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 import sys
 
-is_py2 = sys.version[0] == '2'
+is_py2 = sys.version[0] == "2"
 if is_py2:
     import Queue as queue
 else:
@@ -90,6 +90,7 @@ class ConcurrentBatchIterator(IBatchIterator):
     self.init_fetchers()
     self.counter = 0
     self.relaunch = True
+    self._stopped = False
     self.log_queue = log_queue
     self.name = name
     pass
@@ -142,6 +143,8 @@ class ConcurrentBatchIterator(IBatchIterator):
     pass
 
   def next(self):
+    if self._stopped:
+      raise StopIteration
     self.scan(do_print=(self.counter % self.log_queue == 0))
     if self.counter % self.log_queue == 0:
       self.counter = 0
@@ -173,6 +176,7 @@ class ConcurrentBatchIterator(IBatchIterator):
         if not found_alive:
           for ff in self.fetchers:
             ff.join()
+          self._stopped = True
           raise StopIteration
       else:
         self.info("Got another batch from the queue.")
@@ -196,6 +200,7 @@ class ConcurrentBatchIterator(IBatchIterator):
     self.fetchers = []
     self.init_fetchers()
     self.relaunch = True
+    self._stopped = False
     pass
 
   pass

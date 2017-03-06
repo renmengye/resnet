@@ -15,7 +15,8 @@ def weight_variable(shape,
                     init_param=None,
                     wd=None,
                     name=None,
-                    trainable=True):
+                    trainable=True,
+                    seed=0):
   """Declares a variable.
 
     Args:
@@ -43,14 +44,14 @@ def weight_variable(shape,
     else:
       stddev = init_param["stddev"]
     initializer = tf.truncated_normal_initializer(
-        mean=mean, stddev=stddev, seed=1, dtype=dtype)
+        mean=mean, stddev=stddev, seed=seed, dtype=dtype)
   elif init_method == "uniform_scaling":
     if "factor" not in init_param:
       factor = 1.0
     else:
       factor = init_param["factor"]
     initializer = tf.uniform_unit_scaling_initializer(
-        factor=factor, seed=1, dtype=dtype)
+        factor=factor, seed=seed, dtype=dtype)
   elif init_method == "constant":
     if "val" not in init_param:
       value = 0.0
@@ -59,7 +60,7 @@ def weight_variable(shape,
     initializer = tf.constant_initializer(value=value, dtype=dtype)
   elif init_method == "xavier":
     initializer = tf.contrib.layers.xavier_initializer(
-        uniform=False, seed=1, dtype=dtype)
+        uniform=False, seed=seed, dtype=dtype)
   else:
     raise ValueError("Non supported initialization method!")
   log.info("Weight shape {}".format([int(ss) for ss in shape]))
@@ -152,8 +153,7 @@ def cnn(x,
               # wd=wd,       ####### Change this back if it changes anything!!!
               name="b",
               trainable=trainable)
-        h = tf.nn.conv2d(
-            h, w, strides=strides[ii], padding="SAME", name="conv")
+        h = tf.nn.conv2d(h, w, strides=strides[ii], padding="SAME", name="conv")
         if add_bias:
           h = tf.add(h, b, name="conv_bias")
         if act_fn[ii] is not None:
@@ -307,6 +307,81 @@ def batch_norm(x,
     return normed
 
 
+def batch_norm_new(x,
+                   is_training,
+                   gamma=None,
+                   beta=None,
+                   axes=[0, 1, 2],
+                   keep_average=True,
+                   eps=1e-10,
+                   scope="bn",
+                   name="bn_out",
+                   mean=None,
+                   var=None,
+                   decay=0.99,
+                   dtype=tf.float32):
+  """Applies batch normalization.
+    Collect mean and variances on x except the last dimension. And apply
+    normalization as below:
+    x_ = gamma * (x - mean) / sqrt(var + eps) + beta
+
+    Args:
+      x: Input tensor, [B, ...].
+      n_out: Integer, depth of input variable.
+      gamma: Scaling parameter.
+      beta: Bias parameter.
+      axes: Axes to collect statistics.
+      eps: Denominator bias.
+      mean: Manually calculated mean and var.
+
+    Returns:
+      normed: Batch-normalized variable.
+      mean: Mean used for normalization (optional).
+  """
+  with tf.variable_scope(scope):
+    n_out = x.get_shape()[-1]
+    if keep_average:
+      emean = tf.get_variable(
+          "ema_mean",
+          shape=[n_out],
+          trainable=False,
+          dtype=dtype,
+          initializer=tf.constant_initializer(
+              0.0, dtype=dtype))
+      evar = tf.get_variable(
+          "ema_var",
+          shape=[n_out],
+          trainable=False,
+          dtype=dtype,
+          initializer=tf.constant_initializer(
+              1.0, dtype=dtype))
+    if is_training:
+      if mean is None or var is None:
+        mean, var = tf.nn.moments(x, axes, name="moments")
+
+      if keep_average:
+        ema_mean_op = tf.assign_sub(emean, (emean - mean) * (1 - decay))
+        ema_var_op = tf.assign_sub(evar, (evar - var) * (1 - decay))
+        with tf.control_dependencies([ema_mean_op, ema_var_op]):
+          normed = tf.nn.batch_normalization(
+              x, mean, var, beta, gamma, eps, name=name)
+      else:
+        normed = tf.nn.batch_normalization(
+            x, mean, var, beta, gamma, eps, name=name)
+
+    else:
+      if mean is None or var is None:
+        if keep_average:
+          mean = emean
+          var = evar
+        else:
+          mean, var = tf.nn.moments(x, axes, name="moments")
+
+      normed = tf.nn.batch_normalization(
+          x, mean, var, beta, gamma, eps, name=name)
+  return normed
+
+
 def batch_norm_mean_only(x,
                          n_out,
                          is_training,
@@ -440,8 +515,7 @@ def div_norm_2d(x,
     normed = x - x_mean
     x2 = tf.square(normed)
     x2_mean = tf.reduce_mean(x2, [3], keep_dims=True)
-    x2_mean = tf.nn.conv2d(
-        x2_mean, w_sup, strides=[1, 1, 1, 1], padding='SAME')
+    x2_mean = tf.nn.conv2d(x2_mean, w_sup, strides=[1, 1, 1, 1], padding='SAME')
     denom = tf.sqrt(x2_mean + eps)
     normed = normed / denom
     if gamma is not None:

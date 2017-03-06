@@ -6,8 +6,10 @@ from resnet.utils.concurrent_batch_iter import ConcurrentBatchIterator
 
 def get_dataset(name,
                 split,
+                data_aug=True,
                 batch_size=100,
                 cycle=True,
+                prefetch=True,
                 shuffle=True,
                 num_batches=-1):
   """Gets CIFAR datasets.
@@ -21,28 +23,28 @@ def get_dataset(name,
   """
   if name == "cifar-10":
     dp = CIFAR10Dataset(
-        "data/cifar-10", split, data_aug=True, whiten=False, div255=False)
+        "data/cifar-10", split, data_aug=data_aug, whiten=False, div255=False)
     return get_iter(
         dp,
         batch_size=batch_size,
         shuffle=shuffle,
         cycle=cycle,
-        prefetch=True,
+        prefetch=prefetch,
         num_worker=20,
         queue_size=300)
   elif name == "cifar-100":
     dp = CIFAR100Dataset(
-        "data/cifar-100", split, data_aug=True, whiten=False, div255=False)
+        "data/cifar-100", split, data_aug=data_aug, whiten=False, div255=False)
     return get_iter(
         dp,
         batch_size=batch_size,
         shuffle=shuffle,
         cycle=cycle,
-        prefetch=True,
+        prefetch=prefetch,
         num_worker=20,
         queue_size=300)
   elif name == "imagenet":
-    dp = ImageNetDataset(folder, split, mode=mode)
+    dp = ImageNetDataset("data/imagenet", split, data_aug=data_aug)
     return get_iter(
         dp,
         batch_size=batch_size,
