@@ -2,8 +2,11 @@
 Modified from the original tensorflow version.
 
 ## Installation
+Custom paths first in `setup.sh` (data folder, model save folder, etc.).
 ```bash
 git clone --recursive git://github.com/renmengye/resnet.git
+cd resnet
+./setup.sh
 ```
 
 ## CIFAR
