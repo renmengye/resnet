@@ -1,7 +1,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-from cifar_exp_config import ResNet32Config
+from resnet.configs.cifar_exp_config import ResNet32Config
 
 
 def get_config(dataset, model):
@@ -18,7 +18,6 @@ class ResNet50Config(ResNet32Config):
 
   def __init__(self):
     super(ResNet50Config, self).__init__()
-    self.batch_size = 256
     self.height = 224
     self.width = 224
     self.num_residual_units = [3, 4, 6, 3]  # ResNet-50
@@ -44,6 +43,8 @@ class ResNet50Config(ResNet32Config):
     self.div255 = True
     self.run_validation = False
     self.num_classes = 1000
+    # self.batch_size = 256
+    self.batch_size = 4
 
 
 class ResNet101Config(ResNet50Config):
@@ -52,3 +53,7 @@ class ResNet101Config(ResNet50Config):
     super(ResNet101Config, self).__init__()
     self.num_residual_units = [3, 4, 23, 3]  # ResNet-101
     self.batch_size = 256
+
+
+def get_config_from_json(path):
+  return ResNet50Config.from_json(open(path, "r").read())

@@ -1,30 +1,34 @@
 #!/usr/bin/env python
 """
-Authors: Mengye Ren (mren@cs.toronto.edu) Renjie Liao (rjliao@cs.toronto.edu)
-
-The following code explores different normalization schemes in CNN on ImageNet
-datasets.
+Trains a CNN on ImageNet.
+Author: Mengye Ren (mren@cs.toronto.edu)
 
 Usage:
-python run_imagenet_exp.py --model           [MODEL NAME]        \
-    --config          [CONFIG FILE]       \
-    --data_folder     [DATASET FOLDER]    \
-    --logs            [LOGS FOLDER]       \
-    --results         [SAVE FOLDER]       \
-    --num_gpu         [NUMBER OF GPU]
+./run_imagenet_exp.py --model           [MODEL NAME]                     \
+                      --config          [CONFIG FILE]                    \
+                      --id              [EXPERIMENT ID]                  \
+                      --logs            [LOGS FOLDER]                    \
+                      --results         [SAVE FOLDER]                    \
+                      --restore                                          \
+                      --norestore                                        \
+                      --max_num_steps   [MAX NUM OF STEPS FOR THIS RUN]  \
+                      --num_gpu         [NUMBER OF GPU]                  \
+                      --num_pass        [NUMBER OF FW/BW PASS]
 
 Flags:
-    --model: Model type. Available options are:
-         1) resnet-50
-         2) resnet-101
-         3) resnet-152
-         4) resnet-50-dn
-    --config: Not using the pre-defined configs above, specify the JSON file
+  --model: Model type. Available options are:
+       1) resnet-50
+       2) resnet-101
+  --id: Experiment ID, optional for new experiment.
+  --config: Not using the pre-defined configs above, specify the JSON file
     that contains model configurations.
-    --dataset: Dataset name. Available options are: 1) cifar-10 2) cifar-100.
-    --data_folder: Path to data folder, default is ../data/{DATASET}.
-    --logs: Path to logs folder, default is ../logs/default.
-    --results: Path to save folder, default is ../results.
+  --logs: Path to logs folder, default is ./logs/default.
+  --results: Path to save folder, default is ./results/imagenet.
+  --restore: Whether or not to restore checkpoint. Checkpoint should be 
+    present in [SAVE FOLDER]/[EXPERIMENT ID] folder.
+  --max_num_steps: Maximum number of steps for this training session.
+  --num_gpu: Number of GPU to perform data parallelism.
+  --num_pass: Number of forward and backward passes to average gradients.
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -33,23 +37,23 @@ import numpy as np
 import os
 import tensorflow as tf
 
-from resnet.data import ImageNetDataset
-from resnet.utils import BatchIterator, ConcurrentBatchIterator
-from resnet.utils import logger
+from tqdm import tqdm
 
-import imagenet_exp_config as conf
-from resnet.models import MultiTowerModel
-from resnet.models import MultiPassMultiTowerModel
-from cifar_exp_logger import ExperimentLogger
+from resnet.configs.imagenet_exp_config import get_config, get_config_from_json
+from resnet.data import get_dataset
+from resnet.models import (ResNetModel, MultiTowerModel,
+                           MultiPassMultiTowerModel)
+from resnet.utils import ExperimentLogger, FixedLearnRateScheduler
+from resnet.utils import logger, gen_id
 
 log = logger.get()
 
 flags = tf.flags
-flags.DEFINE_string("config", None, "manually defined config file")
-flags.DEFINE_string("id", None, "experiment ID")
-flags.DEFINE_string("./results", "results/imagenet", "saving folder")
-flags.DEFINE_string("./logs", "logs/default", "logging folder")
-flags.DEFINE_string("model", "resnet-50", "model type")
+flags.DEFINE_string("config", None, "Manually defined config file")
+flags.DEFINE_string("id", None, "Experiment ID")
+flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
+flags.DEFINE_string("logs", "./logs/default", "Logging folder")
+flags.DEFINE_string("model", "resnet-50", "Model name")
 flags.DEFINE_bool("restore", False, "Restore checkpoint")
 flags.DEFINE_integer("max_num_steps", -1, "Maximum number of steps")
 flags.DEFINE_integer("num_gpu", 4, "Number of GPUs")
@@ -59,12 +63,12 @@ FLAGS = flags.FLAGS
 DATASET = "imagenet"
 
 
-def get_config():
+def _get_config():
   # Manually set config.
   if FLAGS.config is not None:
-    return conf.BaselineConfig.from_json(open(FLAGS.config, "r").read())
+    return get_config_from_json(FLAGS.config)
   else:
-    return conf.get_config(DATASET, FLAGS.model)
+    return get_config(DATASET, FLAGS.model)
 
 
 def get_model(config, num_replica, num_pass, is_training):
@@ -94,7 +98,7 @@ def train_step(sess, model, batch):
   return ce
 
 
-def train_model(exp_id, config, train_iter):
+def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
   """Trains a CIFAR model.
 
   Args:
@@ -157,11 +161,13 @@ def train_model(exp_id, config, train_iter):
 
 def main():
   # Loads parammeters.
-  config = get_config()
+  config = _get_config()
 
   if FLAGS.id is None:
     exp_id = "exp_" + DATASET + "_" + FLAGS.model
     exp_id = gen_id(exp_id)
+  else:
+    exp_id = FLAGS.id
 
   if FLAGS.results is not None:
     save_folder = os.path.realpath(
@@ -181,7 +187,7 @@ def main():
 
   # Configures dataset objects.
   log.info("Building dataset")
-  train_data = get_dataset(DATASET, "train")
+  train_data = get_dataset(DATASET, "train", batch_size=config.batch_size)
 
   # Trains a model.
   train_model(

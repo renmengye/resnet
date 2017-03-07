@@ -1,15 +1,16 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import cv2
 import os
 import numpy as np
 import time
 import tensorflow as tf
 import threading
 
-from data import synset
-from data.vgg_preprocessing import preprocess_image
-from utils import logger
+from resnet.data.synset import get_index, get_label
+from resnet.data.vgg_preprocessing import preprocess_image
+from resnet.utils import logger
 
 DEFAULT_FOLDER = "data/imagenet"
 
@@ -17,7 +18,6 @@ log = logger.get()
 
 
 def read_image(path):
-  import cv2
   return cv2.imread(path)
 
 
@@ -144,7 +144,7 @@ class ImageNetDataset(object):
       subfolder = os.path.join(image_folder, ff)
       image_fnames = os.listdir(subfolder)
       _img_ids.extend(image_fnames)
-      _labels.extend([synset.get_index(ff, False)] * len(image_fnames))
+      _labels.extend([get_index(ff, False)] * len(image_fnames))
     _labels = np.array(_labels)
     with open(cache_file, "w") as f:
       for ii, jj in zip(_img_ids, _labels):
@@ -159,7 +159,7 @@ class ImageNetDataset(object):
     img = None
     label = np.zeros([len(idx)], dtype="int32")
     for kk, ii in enumerate(idx):
-      label_name = synset.get_label(self.labels[ii], False)
+      label_name = get_label(self.labels[ii], False)
       img_fname = os.path.join(self.folder, self.split, label_name,
                                self.img_ids[ii])
       # img_ = read_image(img_fname)

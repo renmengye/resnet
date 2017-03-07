@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """
+Train a CNN on CIFAR.
 Author: Mengye Ren (mren@cs.toronto.edu)
 
 Usage:
@@ -34,7 +35,7 @@ import tensorflow as tf
 
 from tqdm import tqdm
 
-from resnet.configs import cifar_exp_config as conf
+from resnet.configs.imagenet_exp_config import get_config, get_config_from_json
 from resnet.data import get_dataset
 from resnet.models import ResNetModel
 from resnet.utils import ExperimentLogger, FixedLearnRateScheduler
@@ -53,12 +54,12 @@ flags.DEFINE_bool("validation", False, "Whether run validation set.")
 FLAGS = flags.FLAGS
 
 
-def get_config():
+def _get_config():
   # Manually set config.
   if FLAGS.config is not None:
-    return conf.get_config_from_json(FLAGS.config)
+    return get_config_from_json(FLAGS.config)
   else:
-    return conf.get_config(FLAGS.dataset, FLAGS.model)
+    return get_config(FLAGS.dataset, FLAGS.model)
 
 
 def train_step(sess, model, batch):
@@ -187,6 +188,8 @@ def main():
   if FLAGS.id is None:
     exp_id = "exp_" + FLAGS.dataset + "_" + FLAGS.model
     exp_id = gen_id(exp_id)
+  else:
+    exp_id = FLAGS.id
 
   if FLAGS.results is not None:
     save_folder = os.path.realpath(

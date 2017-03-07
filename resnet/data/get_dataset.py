@@ -1,5 +1,6 @@
 from resnet.data.cifar10 import CIFAR10Dataset
 from resnet.data.cifar100 import CIFAR100Dataset
+from resnet.data.imagenet import ImageNetDataset
 from resnet.utils.batch_iter import BatchIterator
 from resnet.utils.concurrent_batch_iter import ConcurrentBatchIterator
 
@@ -31,7 +32,8 @@ def get_dataset(name,
         cycle=cycle,
         prefetch=prefetch,
         num_worker=20,
-        queue_size=300)
+        queue_size=300,
+        num_batches=num_batches)
   elif name == "cifar-100":
     dp = CIFAR100Dataset(
         "data/cifar-100", split, data_aug=data_aug, whiten=False, div255=False)
@@ -42,7 +44,8 @@ def get_dataset(name,
         cycle=cycle,
         prefetch=prefetch,
         num_worker=20,
-        queue_size=300)
+        queue_size=300,
+        num_batches=num_batches)
   elif name == "imagenet":
     dp = ImageNetDataset("data/imagenet", split, data_aug=data_aug)
     return get_iter(
@@ -52,7 +55,8 @@ def get_dataset(name,
         cycle=cycle,
         prefetch=True,
         num_worker=20,
-        queue_size=50)
+        queue_size=50,
+        num_batches=num_batches)
   else:
     raise Exception("Unknown dataset {}".format(dataset))
 

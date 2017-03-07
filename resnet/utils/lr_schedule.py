@@ -1,3 +1,8 @@
+from resnet.utils import logger
+
+log = logger.get()
+
+
 class FixedLearnRateScheduler(object):
 
   def __init__(self, sess, model, base_lr, lr_decay_steps, lr_list=None):
