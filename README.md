@@ -16,7 +16,10 @@ cd resnet
 
 ## ImageNet
 ```
+# Run training.
 ./run_imagenet_exp.py --model resnet-50
+
+# Evaluate a trained model. 
 ./run_imagenet_eval.py --id [EXPERIMENT ID]
 ```
 
