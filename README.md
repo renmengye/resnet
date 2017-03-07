@@ -9,7 +9,7 @@ cd resnet
 ./setup.sh
 ```
 
-## CIFAR
+## CIFAR-10/100
 ```bash
 ./run_cifar_exp.py --dataset cifar-10 --model resnet-32
 ```
@@ -21,7 +21,7 @@ cd resnet
 ```
 
 ## ImageNet on Slurm
-SSH into slurm manager node first, and launch jobs there.
+SSH into the slurm manager node first, and then launch jobs there.
 ```
 # Launch a recurring training job, 30K steps per job, for total 600K stes.
 ./run_imagenet_exp_sched.py --model resnet-50 --max_num_steps 30000 --max_max_steps 600000
