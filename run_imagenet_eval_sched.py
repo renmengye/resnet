@@ -18,7 +18,7 @@ import time
 import traceback
 
 from pysched.slurm import SlurmCommandDispatcherFactory
-from pysched.job import LocalCommandDispatcherFactory
+from pysched.local import LocalCommandDispatcherFactory
 from resnet.utils import logger
 
 log = logger.get()
