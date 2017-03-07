@@ -29,13 +29,13 @@ flags.DEFINE_string("machine", None, "Preferred machine")
 flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
 flags.DEFINE_string("logs", "./logs/default", "Logging folder")
 flags.DEFINE_bool("local", False, "Whether run locally or on slurm")
+flags.DEFINE_integer("min_interval", 7200, "Minimum number of seconds")
 FLAGS = flags.FLAGS
 
 if FLAGS.local:
   dispatch_factory = LocalCommandDispatcherFactory()
 else:
   dispatch_factory = SlurmCommandDispatcherFactory()
-MIN_INTERVAL = 7200
 
 if FLAGS.id is None:
   raise Exception("You need to specify model ID.")
@@ -63,5 +63,5 @@ while True:
         exc_type, exc_value, exc_traceback, limit=10, file=sys.stdout)
   end_time = time.time()
   elapsed = end_time - start_time
-  if elapsed < MIN_INTERVAL:
-    time.sleep(MIN_INTERVAL - elapsed)
+  if elapsed < FLAGS.min_interval:
+    time.sleep(FLAGS.min_interval - elapsed)
