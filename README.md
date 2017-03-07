@@ -1,5 +1,5 @@
 # resnet
-Modified from the original tensorflow version.
+Standard ResNet training on image classification benchmarks. Modified from the original tensorflow version.
 
 ## Installation
 Custom paths first in `setup.sh` (data folder, model save folder, etc.).
