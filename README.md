@@ -3,7 +3,7 @@ Modified from the original tensorflow version.
 
 ## Installation
 ```bash
-git clone --recursive git://github.com/renmengye/resnet
+git clone --recursive git://github.com/renmengye/resnet.git
 ```
 
 ## CIFAR

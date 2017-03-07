@@ -1,0 +1,3 @@
+[submodule "pysched"]
+	path = pysched
+	url = git://github.com/renmengye/pysched.git
