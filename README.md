@@ -26,7 +26,7 @@ cd resnet
 ## ImageNet on Slurm
 SSH into the slurm manager node first, and then launch jobs there.
 ```
-# Launch a recurring training job, 30K steps per job, for total 600K stes.
+# Launch a recurring training job, 30K steps per job, for total 600K steps.
 ./run_imagenet_exp_sched.py --model resnet-50 --max_num_steps 30000 --max_max_steps 600000
 
 # Launch a recurring evaluation job every 2 hours.
