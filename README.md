@@ -19,7 +19,7 @@ cd resnet
 # Run training.
 ./run_imagenet_exp.py --model resnet-50
 
-# Evaluate a trained model. 
+# Evaluate a trained model. Launch this on a separate GPU. 
 ./run_imagenet_eval.py --id [EXPERIMENT ID]
 ```
 
