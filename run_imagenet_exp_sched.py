@@ -22,7 +22,7 @@ import traceback
 
 from pysched.slurm import SlurmCommandDispatcherFactory
 from pysched.local import LocalCommandDispatcherFactory
-from resnet.utils import get_id, logger
+from resnet.utils import gen_id, logger
 
 log = logger.get()
 
@@ -49,9 +49,11 @@ else:
 # Generate experiment ID.
 if FLAGS.id is None:
   exp_id = gen_id("exp_" + DATASET + "_" + FLAGS.model)
-  raise Exception("You need to specify model ID.")
+  restore = False
+  # raise Exception("You need to specify model ID.")
 else:
   exp_id = FLAGS.id
+  restore = True
 
 save_folder = os.path.realpath(
     os.path.abspath(os.path.join(FLAGS.results, exp_id)))
@@ -62,6 +64,8 @@ while True:
   if os.path.exists(save_folder):
     latest_ckpt = tf.train.latest_checkpoint(save_folder)
     cur_steps = int(latest_ckpt.split("-")[-1])
+  else:
+    cur_steps = 0
   if cur_steps >= FLAGS.max_max_steps:
     log.info("Maximum steps {} reached.".format(FLAGS.max_max_steps))
     break
@@ -72,12 +76,15 @@ while True:
     log.info("Training model \"{}\"".format(exp_id))
     dispatcher = dispatch_factory.create(
         num_gpu=4, num_cpu=12, machine=FLAGS.machine)
-    job = dispatcher.dispatch([
-        "./run_imagenet_exp.py", "--restore", "--id", exp_id, "--results",
+    arg_list = [
+        "./run_imagenet_exp.py", "--id", exp_id, "--results",
         FLAGS.results, "--logs", FLAGS.logs, "--max_num_steps",
         str(FLAGS.max_num_steps), "--model", FLAGS.model, "--verbose",
         "--num_gpu", "4"
-    ])
+    ]
+    if restore:
+      arg_list.append("--restore")
+    job = dispatcher.dispatch(arg_list)
     code = job.wait()
     if code != 0:
       log.error("Job failed")

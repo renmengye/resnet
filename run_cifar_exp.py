@@ -146,9 +146,21 @@ def train_model(exp_id,
       sess.run(tf.global_variables_initializer())
 
       # Set up learning rate schedule.
-      lr = config.base_learn_rate
-      lr_scheduler = FixedLearnRateScheduler(
-          sess, m, lr, config.lr_decay_steps, lr_list=config.lr_list)
+      if config.lr_scheduler_type == "fixed":
+        lr_scheduler = FixedLearnRateScheduler(
+            sess,
+            m,
+            config.base_learn_rate,
+            config.lr_decay_steps,
+            lr_list=config.lr_list)
+      elif config.lr_scheduler_type == "exponential":
+        lr_scheduler = ExponentialLearnRateScheduler(
+            sess, m, config.base_learn_rate, config.lr_decay_offset,
+            config.max_train_iter, config.final_learn_rate,
+            config.lr_decay_interval)
+      else:
+        raise Exception("Unknown learning rate scheduler {}".format(
+            config.lr_scheduler))
 
       for niter in tqdm(range(config.max_train_iter), desc=exp_id):
         lr_scheduler.step(niter)
@@ -168,6 +180,8 @@ def train_model(exp_id,
 
         if (niter + 1) % config.save_iter == 0 or niter == 0:
           save(sess, saver, m.global_step, config, save_folder)
+          exp_logger.log_learn_rate(niter, m.lr.eval())
+
       test_iter.reset()
       acc = evaluate(test_iter, -1)
   return acc

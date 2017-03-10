@@ -32,6 +32,9 @@ from __future__ import print_function
 import tensorflow as tf
 
 from tensorflow.python.ops import control_flow_ops
+from resnet.utils import logger
+
+log = logger.get()
 
 slim = tf.contrib.slim
 
@@ -332,10 +335,10 @@ def preprocess_image(image, output_height, output_width, is_training=False,
     A preprocessed image.
   """
   if is_training:
-    print("vgg_preprocessing.py: Using random crop")
+    log.info("Using random crop")
     return preprocess_for_train(image, output_height, output_width,
                                 resize_side_min, resize_side_max)
   else:
-    print("vgg_preprocessing.py: Using center crop")
+    log.info("Using center crop")
     return preprocess_for_eval(image, output_height, output_width,
                                resize_side_min)

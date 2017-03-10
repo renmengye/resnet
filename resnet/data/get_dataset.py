@@ -12,12 +12,14 @@ def get_dataset(name,
                 cycle=True,
                 prefetch=True,
                 shuffle=True,
-                num_batches=-1):
-  """Gets CIFAR datasets.
+                num_batches=-1,
+                preprocessor=None):
+  """Gets a dataset.
 
   Args:
       name: "cifar-10" or "cifar-100".
       split: "train", "traintrain", "trainval", or "test".
+      preprocessor: For ImageNet only, whether vgg or inception.
 
   Returns:
       dp: Dataset Iterator.
@@ -47,7 +49,14 @@ def get_dataset(name,
         queue_size=300,
         num_batches=num_batches)
   elif name == "imagenet":
-    dp = ImageNetDataset("data/imagenet", split, data_aug=data_aug)
+    if preprocessor is None:
+      preprocessor = "vgg"
+    elif preprocessor == "inception":
+      preprocessor = "inception"
+    else:
+      raise ValueError("Unknown preprocessor")
+    dp = ImageNetDataset(
+        "data/imagenet", split, data_aug=data_aug, preprocessor=preprocessor)
     return get_iter(
         dp,
         batch_size=batch_size,

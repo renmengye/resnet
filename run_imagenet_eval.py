@@ -109,13 +109,15 @@ def main():
       cycle=False,
       data_aug=False,
       batch_size=config.valid_batch_size,
-      num_batches=100)
+      num_batches=100,
+      preprocessor=config.preprocessor)
   test_data = get_dataset(
       "imagenet",
       "valid",
       cycle=False,
       data_aug=False,
-      batch_size=config.valid_batch_size)
+      batch_size=config.valid_batch_size,
+      preprocessor=config.preprocessor)
 
   # Evaluates a model.
   eval_model(config, train_data, test_data, save_folder, logs_folder)

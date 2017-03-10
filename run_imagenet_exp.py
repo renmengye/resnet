@@ -43,7 +43,8 @@ from resnet.configs.imagenet_exp_config import get_config, get_config_from_json
 from resnet.data import get_dataset
 from resnet.models import (ResNetModel, MultiTowerModel,
                            MultiPassMultiTowerModel)
-from resnet.utils import ExperimentLogger, FixedLearnRateScheduler
+from resnet.utils import (ExperimentLogger, FixedLearnRateScheduler,
+                          ExponentialLearnRateScheduler)
 from resnet.utils import logger, gen_id
 
 log = logger.get()
@@ -98,6 +99,18 @@ def train_step(sess, model, batch):
   return ce
 
 
+def save(sess, saver, global_step, config, save_folder):
+  """Snapshots a model."""
+  if not os.path.isdir(save_folder):
+    os.makedirs(save_folder)
+    config_file = os.path.join(save_folder, "conf.json")
+    with open(config_file, "w") as f:
+      f.write(config.to_json())
+  log.info("Saving to {}".format(save_folder))
+  saver.save(
+      sess, os.path.join(save_folder, "model.ckpt"), global_step=global_step)
+
+
 def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
   """Trains a CIFAR model.
 
@@ -127,7 +140,7 @@ def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
             num_pass=FLAGS.num_pass,
             is_training=True)
 
-    with tf.Session() as sess:
+    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess:
       saver = tf.train.Saver(max_to_keep=None)  ### Keep all checkpoints here!
       if FLAGS.restore:
         log.info("Restore checkpoint \"{}\"".format(save_folder))
@@ -143,9 +156,21 @@ def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
         max_train_iter = min(max_train_iter, niter_start + FLAGS.max_num_steps)
 
       # Set up learning rate schedule.
-      lr = config.base_learn_rate
-      lr_scheduler = FixedLearnRateScheduler(
-          sess, m, lr, config.lr_decay_steps, lr_list=config.lr_list)
+      if config.lr_scheduler == "fixed":
+        lr_scheduler = FixedLearnRateScheduler(
+            sess,
+            m,
+            config.base_learn_rate,
+            config.lr_decay_steps,
+            lr_list=config.lr_list)
+      elif config.lr_scheduler == "exponential":
+        lr_scheduler = ExponentialLearnRateScheduler(
+            sess, m, config.base_learn_rate, config.lr_decay_offset,
+            config.max_train_iter, config.final_learn_rate,
+            config.lr_decay_interval)
+      else:
+        raise Exception("Unknown learning rate scheduler {}".format(
+            config.lr_scheduler))
 
       for niter in tqdm(range(niter_start, config.max_train_iter), desc=exp_id):
         lr_scheduler.step(niter)
@@ -154,9 +179,10 @@ def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
         if (niter + 1) % config.disp_iter == 0 or niter == 0:
           exp_logger.log_train_ce(niter, ce)
 
-        if (niter + 1) % config.save_iter == 0:
+        if (niter + 1) % config.save_iter == 0 or niter == 0:
           if save_folder is not None:
             save(sess, saver, m.global_step, config, save_folder)
+          exp_logger.log_learn_rate(niter, m.lr.eval())
 
 
 def main():
@@ -187,7 +213,11 @@ def main():
 
   # Configures dataset objects.
   log.info("Building dataset")
-  train_data = get_dataset(DATASET, "train", batch_size=config.batch_size)
+  train_data = get_dataset(
+      DATASET,
+      "train",
+      batch_size=config.batch_size,
+      preprocessor=config.preprocessor)
 
   # Trains a model.
   train_model(

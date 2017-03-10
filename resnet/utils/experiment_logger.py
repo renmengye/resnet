@@ -36,6 +36,7 @@ class ExperimentLogger():
         f.write("train_ce.csv,csv,Train Loss (Cross Entropy)\n")
         f.write("train_acc.csv,csv,Train Accuracy\n")
         f.write("valid_acc.csv,csv,Validation Accuracy\n")
+        f.write("learn_rate.csv,csv,Learning Rate\n")
 
       self.train_file_name = os.path.join(logs_folder, "train_ce.csv")
       if not os.path.exists(self.train_file_name):
@@ -51,6 +52,11 @@ class ExperimentLogger():
       if not os.path.exists(self.val_file_name):
         with open(self.val_file_name, "w") as f:
           f.write("step,time,acc\n")
+
+      self.lr_file_name = os.path.join(logs_folder, "learn_rate.csv")
+      if not os.path.exists(self.lr_file_name):
+        with open(self.lr_file_name, "w") as f:
+          f.write("step,time,lr\n")
 
   def log_train_ce(self, niter, ce):
     """Writes training CE."""
@@ -75,3 +81,10 @@ class ExperimentLogger():
       with open(self.val_file_name, "a") as f:
         f.write("{:d},{:s},{:e}\n".format(
             niter + 1, datetime.datetime.now().isoformat(), acc))
+
+  def log_learn_rate(self, niter, lr):
+    """Writes validation accuracy."""
+    if self._write_to_csv:
+      with open(self.lr_file_name, "a") as f:
+        f.write("{:d},{:s},{:e}\n".format(
+            niter + 1, datetime.datetime.now().isoformat(), lr))

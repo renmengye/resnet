@@ -4,12 +4,15 @@ from __future__ import (absolute_import, division, print_function,
 import cv2
 import os
 import numpy as np
+import pickle as pkl
+import tarfile
 import time
 import tensorflow as tf
 import threading
 
 from resnet.data.synset import get_index, get_label
-from resnet.data.vgg_preprocessing import preprocess_image
+from resnet.data.vgg_preprocessing import preprocess_image as vgg_preproc
+from resnet.data.inception_preprocessing import preprocess_image as inception_preproc
 from resnet.utils import logger
 
 DEFAULT_FOLDER = "data/imagenet"
@@ -36,7 +39,7 @@ class ImageNetDataset(object):
                resize_side_min=256,
                resize_side_max=480,
                crop=224,
-               mean_img=None):
+               preprocessor="vgg"):
     """
     Args:
       folder: 
@@ -47,20 +50,32 @@ class ImageNetDataset(object):
     self._folder = folder
     self._img_ids = None
     self._labels = None
+    self._bbox_dict = None
     self._data_aug = data_aug
     self._resize_side_min = resize_side_min
     self._resize_side_max = resize_side_max
     self._crop = crop
+    self._preprocessor = preprocessor
     self._mutex = threading.Lock()
     with tf.device("/cpu:0"):
       self._image_preproc_inp = tf.placeholder(tf.float32, [None, None, 3])
-      self._image_preproc_out = preprocess_image(
-          self._image_preproc_inp,
-          crop,
-          crop,
-          is_training=data_aug,
-          resize_side_min=resize_side_min,
-          resize_side_max=resize_side_max)
+      if preprocessor == "vgg":
+        self._image_preproc_out = vgg_preproc(
+            self._image_preproc_inp,
+            crop,
+            crop,
+            is_training=data_aug,
+            resize_side_min=resize_side_min,
+            resize_side_max=resize_side_max)
+      elif preprocessor == "inception":
+        self._image_bbox = tf.placeholder(tf.float32, [1, None, 4])
+        self._image_preproc_out = inception_preproc(
+            self._image_preproc_inp,
+            crop,
+            crop,
+            is_training=data_aug,
+            bbox=self._image_bbox)
+        b = self.bbox_dict
       self._session = tf.Session()
     pass
 
@@ -71,10 +86,6 @@ class ImageNetDataset(object):
   @property
   def split(self):
     return self._split
-
-  @property
-  def mean_img(self):
-    return self._mean_img
 
   @property
   def crop(self):
@@ -99,6 +110,10 @@ class ImageNetDataset(object):
   @property
   def image_preproc_out(self):
     return self._image_preproc_out
+
+  @property
+  def image_bbox(self):
+    return self._image_bbox
 
   @property
   def img_ids(self):
@@ -154,6 +169,15 @@ class ImageNetDataset(object):
   def get_size(self):
     return len(self.img_ids)
 
+  @property
+  def bbox_dict(self):
+    if self._bbox_dict is None:
+      cache_file = os.path.join(self.folder, "bbox_cache.pkl")
+      log.info("Reading cache from \"{}\".".format(cache_file))
+      with open(cache_file, "rb") as f:
+        self._bbox_dict = pkl.load(f)
+    return self._bbox_dict
+
   def get_batch_idx(self, idx, **kwargs):
     start_time = time.time()
     img = None
@@ -166,8 +190,21 @@ class ImageNetDataset(object):
       img_ = read_image_rgb(img_fname)
       if img_ is None:
         raise Exception("Cannot read \"{}\"".format(img_fname))
-      img_ = self.session.run(self.image_preproc_out,
-                              feed_dict={self.image_preproc_inp: img_})
+
+      if self._preprocessor == "vgg":
+        img_ = self.session.run(self.image_preproc_out,
+                                feed_dict={self.image_preproc_inp: img_})
+      elif self._preprocessor == "inception":
+        if self._data_aug:
+          bbox = np.expand_dims(self.bbox_dict[self.img_ids[ii]], 0)
+          bbox = np.minimum(np.maximum(0.0, bbox), 1.0)
+          img_ = self.session.run(
+              self.image_preproc_out,
+              feed_dict={self.image_preproc_inp: img_,
+                         self.image_bbox: bbox})
+        else:
+          img_ = self.session.run(self.image_preproc_out,
+                                  feed_dict={self.image_preproc_inp: img_})
       if img is None:
         img = np.zeros(
             [len(idx), img_.shape[0], img_.shape[1], img_.shape[2]],

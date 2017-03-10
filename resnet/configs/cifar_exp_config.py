@@ -41,7 +41,7 @@ class ResNet32Config(object):
     self.init_filter = 3
     self.use_bottleneck = False
     self.filters = [16, 16, 32, 64]
-    self.wd = 0.0002
+    self.wd = 2e-4
     # self.relu_leakiness = 0.1   # Original TF model has leaky relu.
     self.relu_leakiness = 0.0
     self.optimizer = "mom"
