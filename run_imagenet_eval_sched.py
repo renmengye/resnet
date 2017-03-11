@@ -27,7 +27,7 @@ flags = tf.flags
 flags.DEFINE_string("id", None, "Experiment ID")
 flags.DEFINE_string("machine", None, "Preferred machine")
 flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
-flags.DEFINE_string("logs", "./logs/default", "Logging folder")
+flags.DEFINE_string("logs", "./logs/public", "Logging folder")
 flags.DEFINE_bool("local", False, "Whether run locally or on slurm")
 flags.DEFINE_integer("min_interval", 7200, "Minimum number of seconds")
 FLAGS = flags.FLAGS

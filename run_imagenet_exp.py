@@ -53,7 +53,7 @@ flags = tf.flags
 flags.DEFINE_string("config", None, "Manually defined config file")
 flags.DEFINE_string("id", None, "Experiment ID")
 flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
-flags.DEFINE_string("logs", "./logs/default", "Logging folder")
+flags.DEFINE_string("logs", "./logs/public", "Logging folder")
 flags.DEFINE_string("model", "resnet-50", "Model name")
 flags.DEFINE_bool("restore", False, "Restore checkpoint")
 flags.DEFINE_integer("max_num_steps", -1, "Maximum number of steps")
@@ -103,9 +103,9 @@ def save(sess, saver, global_step, config, save_folder):
   """Snapshots a model."""
   if not os.path.isdir(save_folder):
     os.makedirs(save_folder)
-    config_file = os.path.join(save_folder, "conf.json")
-    with open(config_file, "w") as f:
-      f.write(config.to_json())
+  config_file = os.path.join(save_folder, "conf.json")
+  with open(config_file, "w") as f:
+    f.write(config.to_json())
   log.info("Saving to {}".format(save_folder))
   saver.save(
       sess, os.path.join(save_folder, "model.ckpt"), global_step=global_step)

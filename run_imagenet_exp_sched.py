@@ -29,7 +29,7 @@ log = logger.get()
 flags = tf.flags
 flags.DEFINE_string("id", None, "Experiment ID")
 flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
-flags.DEFINE_string("logs", "./logs/default", "Logging folder")
+flags.DEFINE_string("logs", "./logs/public", "Logging folder")
 flags.DEFINE_bool("local", False, "Whether run locally or on slurm")
 flags.DEFINE_integer("max_num_steps", 30000, "Maximum number of steps")
 flags.DEFINE_integer("max_max_steps", 600000,

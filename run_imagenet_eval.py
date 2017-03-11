@@ -30,7 +30,7 @@ from resnet.utils import logger, ExperimentLogger
 flags = tf.flags
 flags.DEFINE_string("id", None, "eExperiment ID")
 flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
-flags.DEFINE_string("logs", "./logs/default", "Logging folder")
+flags.DEFINE_string("logs", "./logs/public", "Logging folder")
 FLAGS = tf.flags.FLAGS
 log = logger.get()
 

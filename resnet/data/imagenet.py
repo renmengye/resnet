@@ -58,7 +58,7 @@ class ImageNetDataset(object):
     self._preprocessor = preprocessor
     self._mutex = threading.Lock()
     with tf.device("/cpu:0"):
-      self._image_preproc_inp = tf.placeholder(tf.float32, [None, None, 3])
+      self._image_preproc_inp = tf.placeholder(tf.uint8, [None, None, 3])
       if preprocessor == "vgg":
         self._image_preproc_out = vgg_preproc(
             self._image_preproc_inp,
