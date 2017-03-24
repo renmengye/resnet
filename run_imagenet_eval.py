@@ -73,10 +73,19 @@ def eval_model(config, train_data, test_data, save_folder, logs_folder=None):
     log.info("Building models")
     mvalid = get_model(config)
 
+    # # A hack to load compatible models.
+    # variables = tf.global_variables()
+    # names = map(lambda x: x.name, variables)
+    # names = map(lambda x: x.replace("Model/", "Model/Towers/"), names)
+    # names = map(lambda x: x.replace(":0", ""), names)
+    # var_dict = dict(zip(names, variables))
+
     # Initializes variables.
     with tf.Session() as sess:
+      # saver = tf.train.Saver(var_dict)
       saver = tf.train.Saver()
       ckpt = tf.train.latest_checkpoint(save_folder)
+      # log.fatal(ckpt)
       saver.restore(sess, ckpt)
       train_acc = evaluate(sess, mvalid, train_data)
       val_acc = evaluate(sess, mvalid, test_data)

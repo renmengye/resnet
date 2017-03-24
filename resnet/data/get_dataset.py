@@ -49,12 +49,12 @@ def get_dataset(name,
         queue_size=300,
         num_batches=num_batches)
   elif name == "imagenet":
-    if preprocessor is None:
+    if preprocessor is None or preprocessor == "vgg":
       preprocessor = "vgg"
     elif preprocessor == "inception":
       preprocessor = "inception"
     else:
-      raise ValueError("Unknown preprocessor")
+      raise ValueError("Unknown preprocessor \"{}\"".format(preprocessor))
     dp = ImageNetDataset(
         "data/imagenet", split, data_aug=data_aug, preprocessor=preprocessor)
     return get_iter(

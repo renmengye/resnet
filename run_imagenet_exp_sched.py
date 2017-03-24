@@ -34,6 +34,7 @@ flags.DEFINE_bool("local", False, "Whether run locally or on slurm")
 flags.DEFINE_integer("max_num_steps", 30000, "Maximum number of steps")
 flags.DEFINE_integer("max_max_steps", 600000,
                      "Maximum number of training steps")
+flags.DEFINE_integer("num_pass", 1, "Number of forward-backwad passes")
 flags.DEFINE_integer("min_interval", 7200, "Minimum number of seconds")
 flags.DEFINE_string("model", "resnet-50", "Model name")
 flags.DEFINE_string("machine", None, "Preferred machine")
@@ -77,9 +78,9 @@ while True:
     dispatcher = dispatch_factory.create(
         num_gpu=4, num_cpu=12, machine=FLAGS.machine)
     arg_list = [
-        "./run_imagenet_exp.py", "--id", exp_id, "--results",
-        FLAGS.results, "--logs", FLAGS.logs, "--max_num_steps",
-        str(FLAGS.max_num_steps), "--model", FLAGS.model, "--verbose",
+        "./run_imagenet_exp.py", "--id", exp_id, "--results", FLAGS.results,
+        "--logs", FLAGS.logs, "--max_num_steps", str(FLAGS.max_num_steps),
+        "--model", FLAGS.model, "--num_pass", str(FLAGS.num_pass), "--verbose",
         "--num_gpu", "4"
     ]
     if restore:

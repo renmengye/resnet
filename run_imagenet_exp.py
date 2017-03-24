@@ -80,8 +80,7 @@ def get_model(config, num_replica, num_pass, is_training):
           ResNetModel,
           num_replica=num_replica,
           is_training=is_training,
-          num_passes=num_pass,
-          compatible=True)
+          num_passes=num_pass)
     else:
       return MultiTowerModel(
           config, ResNetModel, num_replica=num_replica, is_training=is_training)
@@ -93,9 +92,7 @@ def get_model(config, num_replica, num_pass, is_training):
 
 def train_step(sess, model, batch):
   """Train step."""
-  feed_data = {model.input: batch["img"], model.label: batch["label"]}
-  cost, ce, _ = sess.run([model.cost, model.cross_ent, model.train_op],
-                         feed_dict=feed_data)
+  ce = model.train_step(sess, batch["img"], batch["label"])
   return ce
 
 

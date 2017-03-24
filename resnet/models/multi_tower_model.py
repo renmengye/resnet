@@ -98,8 +98,8 @@ class MultiTowerModel(object):
   def assign_weights(self, weights):
     return self._towers[0].assign_weights(weights)
 
-  def get_weights(self, compatible=False):
-    return self._towers[0].get_weights(compatible=compatible)
+  def get_weights(self):
+    return self._towers[0].get_weights()
 
   def _build_towers(self):
     # Calculate the gradients for each model tower.

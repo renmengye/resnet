@@ -75,7 +75,8 @@ class ImageNetDataset(object):
             crop,
             is_training=data_aug,
             bbox=self._image_bbox)
-        b = self.bbox_dict
+        if data_aug:
+          b = self.bbox_dict
       self._session = tf.Session()
     pass
 

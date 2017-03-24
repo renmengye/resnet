@@ -24,14 +24,12 @@ class MultiPassMultiTowerModel(object):
                num_passes=2,
                inp=None,
                label=None,
-               optimizer=None,
-               compatible=False):
+               optimizer=None):
     self._config = config
     self._tower_cls = tower_cls
     self._is_training = is_training
     self._num_replica = num_replica
     self._num_passes = num_passes
-    self._compatible = compatible  # Use the deprecated "Tower" name_scope.
 
     # Input.
     if inp is None:
@@ -68,8 +66,8 @@ class MultiPassMultiTowerModel(object):
   def assign_weights(self, weights):
     return self.model.assign_weights(weights)
 
-  def get_weights(self, compatible=False):
-    return self.model.get_weights(compatible=compatible)
+  def get_weights(self):
+    return self.model.get_weights()
 
   def _build_towers(self):
     config = self.config
@@ -83,40 +81,21 @@ class MultiPassMultiTowerModel(object):
       opt = MultiPassOptimizer(opt, num_passes=self.num_passes)
     else:
       opt = None
-    if self._compatible:
-      # Deprecated, to be removed in the future.
-      with tf.variable_scope("Towers"):
-        self._model = MultiTowerModel(
-            config,
-            self._tower_cls,
-            is_training=self._is_training,
-            num_replica=self.num_replica,
-            optimizer=opt,
-            apply_grad=False)
-    else:
-      self._model = MultiTowerModel(
-          config,
-          self._tower_cls,
-          is_training=self._is_training,
-          num_replica=self.num_replica,
-          optimizer=opt,
-          apply_grad=False)
+    self._model = MultiTowerModel(
+        config,
+        self._tower_cls,
+        is_training=self._is_training,
+        num_replica=self.num_replica,
+        optimizer=opt,
+        apply_grad=False)
     if not self.is_training:
       return
     global_step = tf.Variable(0.0, name="global_step", trainable=False)
     self._global_step = global_step
-    if self._compatible:
-      # Deprecated, to be removed in the future.
-      with tf.variable_scope("TowersGrad", reuse=None):
-        for ii in range(self.num_passes):
-          self._train_op_list.append(
-              opt.apply_gradients(
-                  self.model.grads, global_step=global_step))
-    else:
-      for ii in range(self.num_passes):
-        self._train_op_list.append(
-            opt.apply_gradients(
-                self.model.grads, global_step=global_step))
+    for ii in range(self.num_passes):
+      self._train_op_list.append(
+          opt.apply_gradients(
+              self.model.grads, global_step=global_step))
 
   def _slice_data(self, data, idx):
     num_per_pass = int(np.ceil(data.shape[0] / self.num_passes))
@@ -150,6 +129,26 @@ class MultiPassMultiTowerModel(object):
     return sess.run(self.model.output, feed_dict=_feed_data)
 
   @property
+  def input(self):
+    return self._model.input
+
+  @property
+  def output(self):
+    return self._model.output
+
+  @property
+  def label(self):
+    return self._model.label
+
+  @property
+  def cost(self):
+    return self._model.cost
+
+  @property
+  def cross_ent(self):
+    return self._model.cross_ent
+
+  @property
   def opt(self):
     return self._opt
 
@@ -176,6 +175,10 @@ class MultiPassMultiTowerModel(object):
   @property
   def lr(self):
     return self._lr
+
+  @property
+  def train_op(self):
+    return self._train_op
 
 
 def get_diff_signature(w, dw):

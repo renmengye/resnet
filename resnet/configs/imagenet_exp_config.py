@@ -13,6 +13,8 @@ def get_config(dataset, model):
     return ResNet50ExpDecayConfig()
   elif model == "resnet-101":
     return ResNet101Config()
+  elif model == "resnet-101-inception":
+    return ResNet101InceptionConfig()
   else:
     raise Exception("Unknown model")
   pass
@@ -49,7 +51,7 @@ class ResNet50Config(ResNet32Config):
     self.run_validation = False
     self.num_classes = 1000
     # self.batch_size = 4
-    self.batch_size = 256
+    self.batch_size = 100
     self.preprocessor = "vgg"
 
 
@@ -77,6 +79,13 @@ class ResNet101Config(ResNet50Config):
     super(ResNet101Config, self).__init__()
     self.num_residual_units = [3, 4, 23, 3]  # ResNet-101
     self.batch_size = 256
+
+
+class ResNet101InceptionConfig(ResNet101Config):
+
+  def __init__(self):
+    super(ResNet101InceptionConfig, self).__init__()
+    self.preprocessor = "inception"  # VGG or Inception.
 
 
 def get_config_from_json(path):

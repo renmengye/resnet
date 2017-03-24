@@ -82,6 +82,7 @@ def weight_variable(shape,
         regularizer=reg,
         dtype=dtype,
         trainable=trainable)
+  log.info("Initialized weight {}".format(var.name))
   return var
 
 
