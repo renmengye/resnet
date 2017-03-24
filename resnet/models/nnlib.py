@@ -66,7 +66,7 @@ def weight_variable(shape,
   log.info("Weight shape {}".format([int(ss) for ss in shape]))
   if wd is not None:
     if wd > 0.0:
-      reg = lambda x: tf.mul(tf.nn.l2_loss(x), wd)
+      reg = lambda x: tf.multiply(tf.nn.l2_loss(x), wd)
       log.info("Weight decay {}".format(wd))
     else:
       log.warning("No weight decay")

@@ -72,7 +72,7 @@ class ResNetModel(object):
     predictions = tf.nn.softmax(logits)
 
     with tf.variable_scope("costs"):
-      xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, y)
+      xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,labels= y)
       xent = tf.reduce_sum(xent, name="xent") / tf.to_float(tf.shape(x)[0])
       cost = xent
       cost += self._decay()
@@ -346,7 +346,7 @@ class ResNetModel(object):
 
   def _relu(self, x, leakiness=0.0):
     """Relu, with optional leaky support."""
-    return tf.select(tf.less(x, 0.0), leakiness * x, x, name="leaky_relu")
+    return tf.where(tf.less(x, 0.0), leakiness * x, x, name="leaky_relu")
 
   def _fully_connected(self, x, out_dim):
     """FullyConnected layer for final output."""
