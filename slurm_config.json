@@ -9,7 +9,6 @@
     {"name": "guppy10", "priority":  3, "num_gpu": 4 },
     {"name": "guppy13", "priority":  3, "num_gpu": 4 },
     {"name": "guppy14", "priority":  3, "num_gpu": 4 },
-    //{"name": "guppy15", "priority":  3, "num_gpu": 4 },
     {"name": "guppy16", "priority":  3, "num_gpu": 4 },
     {"name": "guppy17", "priority":  3, "num_gpu": 4 },
     {"name": "guppy18", "priority":  5, "num_gpu": 4 },
