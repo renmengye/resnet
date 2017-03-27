@@ -35,7 +35,7 @@ import tensorflow as tf
 
 from tqdm import tqdm
 
-from resnet.configs.imagenet_exp_config import get_config, get_config_from_json
+from resnet.configs.cifar_exp_config import get_config, get_config_from_json
 from resnet.data import get_dataset
 from resnet.models import ResNetModel
 from resnet.utils import ExperimentLogger, FixedLearnRateScheduler
@@ -189,7 +189,7 @@ def train_model(exp_id,
 
 def main():
   # Loads parammeters.
-  config = get_config()
+  config = _get_config()
 
   if FLAGS.validation:
     train_str = "traintrain"

@@ -46,6 +46,7 @@ class ResNet32Config(object):
     self.relu_leakiness = 0.0
     self.optimizer = "mom"
     self.max_train_iter = 80000
+    self.lr_scheduler_type = 'fixed'
     self.lr_decay_steps = [40000, 60000]
     self.lr_list = [1e-2, 1e-3]
     self.model = "resnet-32"
