@@ -45,7 +45,7 @@ DATASET = "imagenet"
 if FLAGS.local:
   dispatch_factory = LocalCommandDispatcherFactory()
 else:
-  dispatch_factory = SlurmCommandDispatcherFactory()
+  dispatch_factory = SlurmCommandDispatcherFactory("slurm_config.json")
 
 # Generate experiment ID.
 if FLAGS.id is None:

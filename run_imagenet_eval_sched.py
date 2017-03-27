@@ -35,7 +35,7 @@ FLAGS = flags.FLAGS
 if FLAGS.local:
   dispatch_factory = LocalCommandDispatcherFactory()
 else:
-  dispatch_factory = SlurmCommandDispatcherFactory()
+  dispatch_factory = SlurmCommandDispatcherFactory("slurm_config.json")
 
 if FLAGS.id is None:
   raise Exception("You need to specify model ID.")
