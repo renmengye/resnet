@@ -17,8 +17,8 @@ import tensorflow as tf
 import time
 import traceback
 
-from pysched.slurm import SlurmCommandDispatcherFactory
-from pysched.local import LocalCommandDispatcherFactory
+from pyschedlib.slurm import SlurmCommandDispatcherFactory
+from pyschedlib.local import LocalCommandDispatcherFactory
 from resnet.utils import logger
 
 log = logger.get()
