@@ -85,6 +85,7 @@ while True:
     ]
     if restore:
       arg_list.append("--restore")
+    restore = True  # Restore at the next time!
     job = dispatcher.dispatch(arg_list)
     code = job.wait()
     if code != 0:
