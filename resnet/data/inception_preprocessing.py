@@ -183,18 +183,18 @@ def preprocess_for_train(image, height, width, bbox, fast_mode=True,
       image = tf.image.convert_image_dtype(image, dtype=tf.float32)
     # Each bounding box has shape [1, num_boxes, box coords] and
     # the coordinates are ordered [ymin, xmin, ymax, xmax].
-    image_with_box = tf.image.draw_bounding_boxes(
-        tf.expand_dims(image, 0), bbox)
-    tf.image_summary('image_with_bounding_boxes', image_with_box)
+    # image_with_box = tf.image.draw_bounding_boxes(
+    #     tf.expand_dims(image, 0), bbox)
+    # tf.image_summary('image_with_bounding_boxes', image_with_box)
 
     distorted_image, distorted_bbox = distorted_bounding_box_crop(image, bbox)
     # Restore the shape since the dynamic slice based upon the bbox_size loses
     # the third dimension.
     distorted_image.set_shape([None, None, 3])
-    image_with_distorted_box = tf.image.draw_bounding_boxes(
-        tf.expand_dims(image, 0), distorted_bbox)
-    tf.image_summary('images_with_distorted_bounding_box',
-                     image_with_distorted_box)
+    # image_with_distorted_box = tf.image.draw_bounding_boxes(
+    #     tf.expand_dims(image, 0), distorted_bbox)
+    # tf.image_summary('images_with_distorted_bounding_box',
+    #                  image_with_distorted_box)
 
     # This resizing operation may distort the images because the aspect
     # ratio is not respected. We select a resize method in a round robin
@@ -208,8 +208,8 @@ def preprocess_for_train(image, height, width, bbox, fast_mode=True,
         lambda x, method: tf.image.resize_images(x, [height, width], method=method),
         num_cases=num_resize_cases)
 
-    tf.image_summary('cropped_resized_image',
-                     tf.expand_dims(distorted_image, 0))
+    # tf.image_summary('cropped_resized_image',
+    #                  tf.expand_dims(distorted_image, 0))
 
     # Randomly flip the image horizontally.
     distorted_image = tf.image.random_flip_left_right(distorted_image)
@@ -220,10 +220,10 @@ def preprocess_for_train(image, height, width, bbox, fast_mode=True,
         lambda x, ordering: distort_color(x, ordering, fast_mode),
         num_cases=4)
 
-    tf.image_summary('final_distorted_image',
-                     tf.expand_dims(distorted_image, 0))
-    distorted_image = tf.sub(distorted_image, 0.5)
-    distorted_image = tf.mul(distorted_image, 2.0)
+    # tf.image_summary('final_distorted_image',
+    #                  tf.expand_dims(distorted_image, 0))
+    distorted_image = tf.subtract(distorted_image, 0.5)
+    distorted_image = tf.multiply(distorted_image, 2.0)
     return distorted_image
 
 
@@ -263,8 +263,8 @@ def preprocess_for_eval(image,
       image = tf.image.resize_bilinear(
           image, [height, width], align_corners=False)
       image = tf.squeeze(image, [0])
-    image = tf.sub(image, 0.5)
-    image = tf.mul(image, 2.0)
+    image = tf.subtract(image, 0.5)
+    image = tf.multiply(image, 2.0)
     return image
 
 

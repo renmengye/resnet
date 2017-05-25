@@ -24,7 +24,7 @@ Flags:
     that contains model configurations.
   --logs: Path to logs folder, default is ./logs/default.
   --results: Path to save folder, default is ./results/imagenet.
-  --restore: Whether or not to restore checkpoint. Checkpoint should be 
+  --restore: Whether or not to restore checkpoint. Checkpoint should be
     present in [SAVE FOLDER]/[EXPERIMENT ID] folder.
   --max_num_steps: Maximum number of steps for this training session.
   --num_gpu: Number of GPU to perform data parallelism.
@@ -33,18 +33,17 @@ Flags:
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import json
 import numpy as np
 import os
 import tensorflow as tf
 
 from tqdm import tqdm
 
-from resnet.configs.imagenet_exp_config import get_config, get_config_from_json
+from resnet.configs import get_config, get_config_from_json
 from resnet.data import get_dataset
-from resnet.models import (ResNetModel, MultiTowerModel,
-                           MultiPassMultiTowerModel)
-from resnet.utils import (ExperimentLogger, FixedLearnRateScheduler,
-                          ExponentialLearnRateScheduler)
+from resnet.models import get_multi_gpu_model
+from resnet.utils import (ExperimentLogger, FixedLearnRateScheduler)
 from resnet.utils import logger, gen_id
 
 log = logger.get()
@@ -72,22 +71,18 @@ def _get_config():
     return get_config(DATASET, FLAGS.model)
 
 
-def get_model(config, num_replica, num_pass, is_training):
-  if num_replica > 1:
-    if num_pass > 1:
-      return MultiPassMultiTowerModel(
-          config,
-          ResNetModel,
-          num_replica=num_replica,
-          is_training=is_training,
-          num_passes=num_pass)
-    else:
-      return MultiTowerModel(
-          config, ResNetModel, num_replica=num_replica, is_training=is_training)
-  elif num_replica == 1:
-    return ResNetModel(config, is_training=is_training)
-  else:
-    raise Exception("Unacceptable number of replica: {}".format(num_replica))
+def _get_model(config, num_replica, num_pass, is_training):
+  """Builds a model."""
+  with log.verbose_level(2):
+    return get_multi_gpu_model(
+        config.model_class,
+        config,
+        num_replica=num_replica,
+        num_pass=num_pass,
+        is_training=is_training,
+        batch_size=config.batch_size,
+        multi_session=config.model_class.startswith("ms"),
+        use_nccl=config.model_class.endswith("-gpu"))
 
 
 def train_step(sess, model, batch):
@@ -102,14 +97,14 @@ def save(sess, saver, global_step, config, save_folder):
     os.makedirs(save_folder)
   config_file = os.path.join(save_folder, "conf.json")
   with open(config_file, "w") as f:
-    f.write(config.to_json())
+    f.write(json.dumps(config, default=lambda o: o.__dict__))
   log.info("Saving to {}".format(save_folder))
   saver.save(
       sess, os.path.join(save_folder, "model.ckpt"), global_step=global_step)
 
 
 def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
-  """Trains a CIFAR model.
+  """Trains an ImageNet model.
 
   Args:
     exp_id: String. Experiment ID.
@@ -131,7 +126,7 @@ def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
     log.info("Building models")
     with tf.name_scope("Train"):
       with tf.variable_scope("Model", reuse=None):
-        m = get_model(
+        m = _get_model(
             config,
             num_replica=FLAGS.num_gpu,
             num_pass=FLAGS.num_pass,
@@ -144,6 +139,13 @@ def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
         saver.restore(sess, tf.train.latest_checkpoint(save_folder))
       else:
         sess.run(tf.global_variables_initializer())
+
+      # Count parameters.
+      w_list = tf.trainable_variables()
+      num_params = np.array([
+          np.prod(np.array([int(ss) for ss in w.get_shape()])) for w in w_list
+      ]).sum()
+      log.info("Number of parameters {}".format(num_params))
 
       max_train_iter = config.max_train_iter
       niter_start = int(m.global_step.eval())
@@ -160,11 +162,6 @@ def train_model(exp_id, config, train_iter, save_folder=None, logs_folder=None):
             config.base_learn_rate,
             config.lr_decay_steps,
             lr_list=config.lr_list)
-      elif config.lr_scheduler == "exponential":
-        lr_scheduler = ExponentialLearnRateScheduler(
-            sess, m, config.base_learn_rate, config.lr_decay_offset,
-            config.max_train_iter, config.final_learn_rate,
-            config.lr_decay_interval)
       else:
         raise Exception("Unknown learning rate scheduler {}".format(
             config.lr_scheduler))

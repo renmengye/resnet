@@ -16,12 +16,14 @@ class ExperimentLogger():
   def __init__(self, logs_folder):
     """Initialize files."""
     self._write_to_csv = logs_folder is not None
+    self.logs_folder = logs_folder
 
     if self._write_to_csv:
       if not os.path.isdir(logs_folder):
         os.makedirs(logs_folder)
 
       catalog_file = os.path.join(logs_folder, "catalog")
+      self.catalog_file = catalog_file
 
       with open(catalog_file, "w") as f:
         f.write("filename,type,name\n")
@@ -57,6 +59,37 @@ class ExperimentLogger():
       if not os.path.exists(self.lr_file_name):
         with open(self.lr_file_name, "w") as f:
           f.write("step,time,lr\n")
+
+  def log_value(self, niter, key, value, name, name_short=None):
+    if name_short is None:
+      name_short = key
+    log.info("{} = {:.4e}".format(name, value))
+    if self._write_to_csv:
+      file_name_short = name_short + ".csv"
+      file_name = os.path.join(self.logs_folder, file_name_short)
+      if not os.path.exists(file_name):
+        with open(file_name, "w") as f:
+          f.write("step,time,{}\n".format(key))
+        with open(self.catalog_file, "a") as f:
+          f.write("{},csv,{}\n".format(file_name_short, name))
+      with open(file_name, "a") as f:
+        f.write("{:d},{:s},{:e}\n".format(
+            niter + 1, datetime.datetime.now().isoformat(), value))
+
+  def log_value_list(self, niter, keys, values, name, name_short):
+    if self._write_to_csv:
+      file_name_short = name_short + ".csv"
+      file_name = os.path.join(self.logs_folder, file_name_short)
+      if not os.path.exists(file_name):
+        with open(file_name, "w") as f:
+          f.write("step,time,{}\n".format(",".join(keys)))
+        with open(self.catalog_file, "a") as f:
+          f.write("{},csv,{}\n".format(file_name_short, name))
+      with open(file_name, "a") as f:
+        f.write("{:d},{:s},{}\n".format(
+            niter + 1,
+            datetime.datetime.now().isoformat(), ",".join(
+                ["{:e}".format(v) for v in values])))
 
   def log_train_ce(self, niter, ce):
     """Writes training CE."""

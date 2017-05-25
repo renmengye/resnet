@@ -1,3 +1,6 @@
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
+
 from resnet.data.cifar10 import CIFAR10Dataset
 from resnet.data.cifar100 import CIFAR100Dataset
 from resnet.data.imagenet import ImageNetDataset

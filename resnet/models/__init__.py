@@ -1,3 +1,3 @@
 from resnet_model import ResNetModel
-from multi_tower_model import MultiTowerModel
-from multi_pass_multi_tower_model import MultiPassMultiTowerModel
+from resnet_model_gpu import ResNetModelGPU
+from model_factory import get_model, get_multi_gpu_model

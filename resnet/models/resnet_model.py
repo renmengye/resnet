@@ -30,7 +30,8 @@ from __future__ import (absolute_import, division, print_function,
 import numpy as np
 import tensorflow as tf
 
-from resnet.models import nnlib as nn
+from resnet.models.nnlib import concat, weight_variable_cpu, batch_norm
+from resnet.models.model_factory import RegisterModel
 from resnet.utils import logger
 
 log = logger.get()
@@ -44,7 +45,12 @@ class ResNetModel(object):
                is_training=True,
                inference_only=False,
                inp=None,
-               label=None):
+               label=None,
+               dtype=tf.float32,
+               dilated=False,
+               batch_size=None,
+               apply_grad=True,
+               idx=0):
     """ResNet constructor.
 
     Args:
@@ -53,18 +59,26 @@ class ResNetModel(object):
       inference_only: Do not build optimizer.
     """
     self._config = config
-    self._l1_collection = []
+    self._dtype = dtype
+    self._apply_grad = apply_grad
+    self._saved_hidden = []
+    # Debug purpose only.
+    self._saved_hidden2 = []
+    self._bn_update_ops = []
     self.is_training = is_training
+    self._batch_size = batch_size
+    self._dilated = False
 
     # Input.
     if inp is None:
       x = tf.placeholder(
-          tf.float32, [None, config.height, config.width, config.num_channel])
+          dtype, [batch_size, config.height, config.width, config.num_channel],
+          "x")
     else:
       x = inp
 
     if label is None:
-      y = tf.placeholder(tf.int32, [None])
+      y = tf.placeholder(tf.int32, [batch_size], "y")
     else:
       y = label
 
@@ -72,38 +86,49 @@ class ResNetModel(object):
     predictions = tf.nn.softmax(logits)
 
     with tf.variable_scope("costs"):
-      xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,labels= y)
-      xent = tf.reduce_sum(xent, name="xent") / tf.to_float(tf.shape(x)[0])
+      xent = tf.nn.sparse_softmax_cross_entropy_with_logits(
+          logits=logits, labels=y)
+      xent = tf.reduce_mean(xent, name="xent")
       cost = xent
       cost += self._decay()
-      cost += self._l1_loss()
 
     self._cost = cost
     self._input = x
+    # Make sure that the labels are in reasonable range.
+    # with tf.control_dependencies(
+    #     [tf.assert_greater_equal(y, 0), tf.assert_less(y, config.num_classes)]):
+    #   self._label = tf.identity(y)
     self._label = y
     self._cross_ent = xent
     self._output = predictions
+    self._output_idx = tf.cast(tf.argmax(predictions, axis=1), tf.int32)
+    self._correct = tf.to_float(tf.equal(self._output_idx, self.label))
 
     if not is_training or inference_only:
       return
 
-    global_step = tf.Variable(0.0, name="global_step", trainable=False)
-    lr = tf.Variable(0.0, name="learn_rate", trainable=False)
-    trainable_variables = tf.trainable_variables()
-    grads = tf.gradients(cost, trainable_variables)
-    if config.optimizer == "sgd":
-      optimizer = tf.train.GradientDescentOptimizer(lr)
-    elif config.optimizer == "mom":
-      optimizer = tf.train.MomentumOptimizer(lr, 0.9)
-    train_op = optimizer.apply_gradients(
-        zip(grads, trainable_variables),
-        global_step=global_step,
-        name="train_step")
-    self._train_op = train_op
-    self._global_step = global_step
+    global_step = tf.get_variable(
+        "global_step", [],
+        initializer=tf.constant_initializer(0.0),
+        trainable=False,
+        dtype=dtype)
+    lr = tf.get_variable(
+        "learn_rate", [],
+        initializer=tf.constant_initializer(0.0),
+        trainable=False,
+        dtype=dtype)
     self._lr = lr
-    self._new_lr = tf.placeholder(
-        tf.float32, shape=[], name="new_learning_rate")
+    self._grads_and_vars = self._compute_gradients(cost)
+    log.info("BN update ops:")
+    [log.info(op) for op in self.bn_update_ops]
+    log.info("Total number of BN updates: {}".format(len(self.bn_update_ops)))
+    tf.get_variable_scope()._reuse = None
+    if self._apply_grad:
+      tf.get_variable_scope()._reuse = None
+      self._train_op = self._apply_gradients(
+          self._grads_and_vars, global_step=global_step, name="train_step")
+    self._global_step = global_step
+    self._new_lr = tf.placeholder(dtype, shape=[], name="new_learning_rate")
     self._lr_update = tf.assign(self._lr, self._new_lr)
 
   def assign_lr(self, session, lr_value):
@@ -111,45 +136,25 @@ class ResNetModel(object):
     log.info("Adjusting learning rate to {}".format(lr_value))
     session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
 
-  @property
-  def cost(self):
-    return self._cost
+  def _apply_gradients(self,
+                       grads_and_vars,
+                       global_step=None,
+                       name="train_step"):
+    """Apply the gradients globally."""
+    if self.config.optimizer == "sgd":
+      opt = tf.train.GradientDescentOptimizer(self.lr)
+    elif self.config.optimizer == "mom":
+      opt = tf.train.MomentumOptimizer(self.lr, 0.9)
+    train_op = opt.apply_gradients(
+        self._grads_and_vars, global_step=global_step, name="train_step")
+    return train_op
 
-  @property
-  def train_op(self):
-    return self._train_op
-
-  @property
-  def config(self):
-    return self._config
-
-  @property
-  def lr(self):
-    return self._lr
-
-  @property
-  def input(self):
-    return self._input
-
-  @property
-  def output(self):
-    return self._output
-
-  @property
-  def label(self):
-    return self._label
-
-  @property
-  def cross_ent(self):
-    return self._cross_ent
-
-  @property
-  def global_step(self):
-    return self._global_step
-
-  @property
-  def l1_collection(self):
-    return self._l1_collection
+  def _compute_gradients(self, cost, var_list=None):
+    """Compute the gradients to variables."""
+    if var_list is None:
+      var_list = tf.trainable_variables()
+    grads = tf.gradients(cost, var_list, gate_gradients=True)
+    return zip(grads, var_list)
 
   def build_inference_network(self, x):
     config = self.config
@@ -161,9 +166,10 @@ class ResNetModel(object):
     init_filter = config.init_filter
 
     with tf.variable_scope("init"):
-      h = self._conv("init_conv", x, init_filter,
-                     int(x.get_shape()[-1]), filters[0],
-                     self._stride_arr(config.init_stride))
+      h = self._conv("init_conv", x, init_filter, self.config.num_channel,
+                     filters[0], self._stride_arr(config.init_stride))
+      h = self._batch_norm("init_bn", h)
+      h = self._relu("init_relu", h)
 
       # Max-pooling is used in ImageNet experiments to further reduce
       # dimensionality.
@@ -178,95 +184,208 @@ class ResNetModel(object):
     else:
       res_func = self._residual
 
-    for ss in range(num_stages):
-      with tf.variable_scope("unit_{}_0".format(ss + 1)):
+    # New version, single for-loop. Easier for checkpoint.
+    nlayers = sum(config.num_residual_units)
+    ss = 0
+    ii = 0
+    for ll in range(nlayers):
+      # Residual unit configuration.
+      if ss == 0 and ii == 0:
+        no_activation = True
+      else:
+        no_activation = False
+      if ii == 0:
+        if ss == 0:
+          no_activation = True
+        else:
+          no_activation = False
+        in_filter = filters[ss]
+        stride = self._stride_arr(strides[ss])
+      else:
+        in_filter = filters[ss + 1]
+        stride = self._stride_arr(1)
+      out_filter = filters[ss + 1]
+
+      # Save hidden state.
+      if ii == 0:
+        self._saved_hidden.append(h)
+
+      # Build residual unit.
+      with tf.variable_scope("unit_{}_{}".format(ss + 1, ii)):
         h = res_func(
             h,
-            filters[ss],
-            filters[ss + 1],
-            self._stride_arr(strides[ss]),
-            activate_before_residual=activate_before_residual[ss])
-      for ii in range(1, config.num_residual_units[ss]):
-        with tf.variable_scope("unit_{}_{}".format(ss + 1, ii)):
-          h = res_func(
-              h,
-              filters[ss + 1],
-              filters[ss + 1],
-              self._stride_arr(1),
-              activate_before_residual=False)
+            in_filter,
+            out_filter,
+            stride,
+            no_activation=no_activation,
+            add_bn_ops=True)
+
+      if (ii + 1) % config.num_residual_units[ss] == 0:
+        ss += 1
+        ii = 0
+      else:
+        ii += 1
+
+    # Save hidden state.
+    self._saved_hidden.append(h)
+
+    # Make a single tensor.
+    if type(h) == tuple:
+      h = concat(h, axis=3)
 
     with tf.variable_scope("unit_last"):
       h = self._batch_norm("final_bn", h)
-      h = self._relu(h, config.relu_leakiness)
+      h = self._relu("final_relu", h)
 
     h = self._global_avg_pool(h)
 
+    # Classification layer.
     with tf.variable_scope("logit"):
       logits = self._fully_connected(h, config.num_classes)
 
     return logits
 
+  def _weight_variable(self,
+                       shape,
+                       init_method=None,
+                       dtype=tf.float32,
+                       init_param=None,
+                       wd=None,
+                       name=None,
+                       trainable=True,
+                       seed=0):
+    """Wrapper to declare variables. Default on CPU."""
+    return weight_variable_cpu(
+        shape,
+        init_method=init_method,
+        dtype=dtype,
+        init_param=init_param,
+        wd=wd,
+        name=name,
+        trainable=trainable,
+        seed=seed)
+
   def _stride_arr(self, stride):
     """Map a stride scalar to the stride array for tf.nn.conv2d."""
     return [1, stride, stride, 1]
 
-  def _batch_norm(self, name, x):
+  def _batch_norm(self, name, x, add_ops=True):
     """Batch normalization."""
     with tf.variable_scope(name):
       n_out = x.get_shape()[-1]
-      beta = nn.weight_variable(
-          [n_out], init_method="constant", init_param={"val": 0.0}, name="beta")
-      gamma = nn.weight_variable(
-          [n_out],
+      try:
+        n_out = int(n_out)
+        shape = [n_out]
+      except:
+        shape = None
+      beta = self._weight_variable(
+          shape,
+          init_method="constant",
+          init_param={"val": 0.0},
+          name="beta",
+          dtype=self.dtype)
+      gamma = self._weight_variable(
+          shape,
           init_method="constant",
           init_param={"val": 1.0},
-          name="gamma")
-      return nn.batch_norm(
+          name="gamma",
+          dtype=self.dtype)
+      normed, ops = batch_norm(
           x,
           self.is_training,
           gamma=gamma,
           beta=beta,
           axes=[0, 1, 2],
           eps=1e-3,
-          scope="bn",
           name="bn_out")
+      if add_ops:
+        if ops is not None:
+          self._bn_update_ops.extend(ops)
+      return normed
+
+  def _possible_downsample(self, x, in_filter, out_filter, stride):
+    """Downsample the feature map using average pooling, if the filter size
+    does not match."""
+    if stride[1] > 1:
+      with tf.variable_scope("downsample"):
+        x = tf.nn.avg_pool(x, stride, stride, "VALID")
+
+    if in_filter < out_filter:
+      with tf.variable_scope("pad"):
+        x = tf.pad(
+            x, [[0, 0], [0, 0], [0, 0],
+                [(out_filter - in_filter) // 2, (out_filter - in_filter) // 2]])
+    return x
+
+  def _residual_inner(self,
+                      x,
+                      in_filter,
+                      out_filter,
+                      stride,
+                      no_activation=False,
+                      add_bn_ops=True):
+    """Transformation applied on residual units."""
+    with tf.variable_scope("sub1"):
+      if not no_activation:
+        x = self._batch_norm("bn1", x, add_ops=add_bn_ops)
+        x = self._relu("relu1", x)
+      x = self._conv("conv1", x, 3, in_filter, out_filter, stride)
+    with tf.variable_scope("sub2"):
+      x = self._batch_norm("bn2", x, add_ops=add_bn_ops)
+      x = self._relu("relu2", x)
+      x = self._conv("conv2", x, 3, out_filter, out_filter, [1, 1, 1, 1])
+    return x
 
   def _residual(self,
                 x,
                 in_filter,
                 out_filter,
                 stride,
-                activate_before_residual=False):
+                no_activation=False,
+                add_bn_ops=True):
     """Residual unit with 2 sub layers."""
-    if activate_before_residual:
-      with tf.variable_scope("shared_activation"):
-        x = self._batch_norm("init_bn", x)
-        x = self._relu(x, self.config.relu_leakiness)
-        orig_x = x
-    else:
-      with tf.variable_scope("residual_only_activation"):
-        orig_x = x
-        x = self._batch_norm("init_bn", x)
-        x = self._relu(x, self.config.relu_leakiness)
+    orig_x = x
+    x = self._residual_inner(
+        x,
+        in_filter,
+        out_filter,
+        stride,
+        no_activation=no_activation,
+        add_bn_ops=add_bn_ops)
+    x += self._possible_downsample(orig_x, in_filter, out_filter, stride)
+    #log.info("Activation after unit {}".format(
+    #    [int(ss) for ss in x.get_shape()[1:]]))
+    return x
 
+  def _bottleneck_residual_inner(self,
+                                 x,
+                                 in_filter,
+                                 out_filter,
+                                 stride,
+                                 no_activation=False,
+                                 add_bn_ops=True):
+    """Transformation applied on bottleneck residual units."""
     with tf.variable_scope("sub1"):
-      x = self._conv("conv1", x, 3, in_filter, out_filter, stride)
-
+      if not no_activation:
+        x = self._batch_norm("bn1", x, add_ops=add_bn_ops)
+        x = self._relu("relu1", x)
+      x = self._conv("conv1", x, 1, in_filter, out_filter // 4, stride)
     with tf.variable_scope("sub2"):
-      x = self._batch_norm("bn2", x)
-      x = self._relu(x, self.config.relu_leakiness)
-      x = self._conv("conv2", x, 3, out_filter, out_filter, [1, 1, 1, 1])
+      x = self._batch_norm("bn2", x, add_ops=add_bn_ops)
+      x = self._relu("relu2", x)
+      x = self._conv("conv2", x, 3, out_filter // 4, out_filter // 4,
+                     self._stride_arr(1))
+    with tf.variable_scope("sub3"):
+      x = self._batch_norm("bn3", x, add_ops=add_bn_ops)
+      x = self._relu("relu3", x)
+      x = self._conv("conv3", x, 1, out_filter // 4, out_filter,
+                     self._stride_arr(1))
+    return x
 
-    with tf.variable_scope("sub_add"):
-      if in_filter != out_filter:
-        orig_x = tf.nn.avg_pool(orig_x, stride, stride, "VALID")
-        orig_x = tf.pad(
-            orig_x,
-            [[0, 0], [0, 0], [0, 0],
-             [(out_filter - in_filter) // 2, (out_filter - in_filter) // 2]])
-      x += orig_x
-    log.info("Activation after unit {}".format(
-        [int(ss) for ss in x.get_shape()[1:]]))
+  def _possible_bottleneck_downsample(self, x, in_filter, out_filter, stride):
+    """Downsample projection layer, if the filter size does not match."""
+    if stride[1] > 1 or in_filter != out_filter:
+      x = self._conv("project", x, 1, in_filter, out_filter, stride)
     return x
 
   def _bottleneck_residual(self,
@@ -274,46 +393,26 @@ class ResNetModel(object):
                            in_filter,
                            out_filter,
                            stride,
-                           activate_before_residual=False):
+                           no_activation=False,
+                           add_bn_ops=True):
     """Bottleneck resisual unit with 3 sub layers."""
-    if activate_before_residual:
-      with tf.variable_scope("common_bn_relu"):
-        x = self._batch_norm("init_bn", x)
-        x = self._relu(x, self.config.relu_leakiness)
-        orig_x = x
-    else:
-      with tf.variable_scope("residual_bn_relu"):
-        orig_x = x
-        x = self._batch_norm("init_bn", x)
-        x = self._relu(x, self.config.relu_leakiness)
-
-    with tf.variable_scope("sub1"):
-      x = self._conv("conv1", x, 1, in_filter, out_filter / 4, stride)
-
-    with tf.variable_scope("sub2"):
-      x = self._batch_norm("bn2", x)
-      x = self._relu(x, self.config.relu_leakiness)
-      x = self._conv("conv2", x, 3, out_filter / 4, out_filter / 4,
-                     [1, 1, 1, 1])
-
-    with tf.variable_scope("sub3"):
-      x = self._batch_norm("bn3", x)
-      x = self._relu(x, self.config.relu_leakiness)
-      x = self._conv("conv3", x, 1, out_filter / 4, out_filter, [1, 1, 1, 1])
-
-    with tf.variable_scope("sub_add"):
-      if in_filter != out_filter:
-        orig_x = self._conv("project", orig_x, 1, in_filter, out_filter, stride)
-      x += orig_x
-
-    log.info("Activation after unit {}".format(
-        [int(ss) for ss in x.get_shape()[1:]]))
+    orig_x = x
+    x = self._bottleneck_residual_inner(
+        x,
+        in_filter,
+        out_filter,
+        stride,
+        no_activation=no_activation,
+        add_bn_ops=add_bn_ops)
+    x += self._possible_bottleneck_downsample(orig_x, in_filter, out_filter,
+                                              stride)
     return x
 
   def _decay(self):
     """L2 weight decay loss."""
     wd_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-    log.info("Weight decay variables: {}".format(wd_losses))
+    log.info("Weight decay variables")
+    [log.info(x) for x in wd_losses]
     log.info("Total length: {}".format(len(wd_losses)))
     if len(wd_losses) > 0:
       return tf.add_n(wd_losses)
@@ -321,51 +420,156 @@ class ResNetModel(object):
       log.warning("No weight decay variables!")
       return 0.0
 
-  def _l1_loss(self):
-    """L1 activation loss."""
-    # l1_reg_losses = tf.get_collection(L1_REG_KEY)
-    if len(self.l1_collection) > 0:
-      log.warning("L1 Regularizers {}".format(self.l1_collection))
-      return tf.add_n(self.l1_collection)
-    else:
-      log.warning("No L1 loss variables!")
-      return 0.0
-
   def _conv(self, name, x, filter_size, in_filters, out_filters, strides):
     """Convolution."""
     with tf.variable_scope(name):
-      n = filter_size * filter_size * out_filters
-      kernel = nn.weight_variable(
+      if self.config.filter_initialization == "normal":
+        n = filter_size * filter_size * out_filters
+        init_method = "truncated_normal"
+        init_param = {"mean": 0, "stddev": np.sqrt(2.0 / n)}
+      elif self.config.filter_initialization == "uniform":
+        init_method = "uniform_scaling"
+        init_param = {"factor": 1.0}
+      kernel = self._weight_variable(
           [filter_size, filter_size, in_filters, out_filters],
-          init_method="truncated_normal",
-          init_param={"mean": 0,
-                      "stddev": np.sqrt(2.0 / n)},
+          init_method=init_method,
+          init_param=init_param,
           wd=self.config.wd,
+          dtype=self.dtype,
           name="w")
       return tf.nn.conv2d(x, kernel, strides, padding="SAME")
 
-  def _relu(self, x, leakiness=0.0):
-    """Relu, with optional leaky support."""
-    return tf.where(tf.less(x, 0.0), leakiness * x, x, name="leaky_relu")
+  def _relu(self, name, x):
+    return tf.nn.relu(x, name=name)
 
   def _fully_connected(self, x, out_dim):
     """FullyConnected layer for final output."""
     x_shape = x.get_shape()
     d = x_shape[1]
-    w = nn.weight_variable(
+    w = self._weight_variable(
         [d, out_dim],
         init_method="uniform_scaling",
         init_param={"factor": 1.0},
         wd=self.config.wd,
+        dtype=self.dtype,
         name="w")
-    b = nn.weight_variable(
-        [out_dim], init_method="constant", init_param={"val": 0.0}, name="b")
+    b = self._weight_variable(
+        [out_dim],
+        init_method="constant",
+        init_param={"val": 0.0},
+        name="b",
+        dtype=self.dtype)
     return tf.nn.xw_plus_b(x, w, b)
 
   def _global_avg_pool(self, x):
-    assert x.get_shape().ndims == 4
+    # assert x.get_shape().ndims == 4
     return tf.reduce_mean(x, [1, 2])
 
-  def infer_step(self, sess, inp):
+  def infer_step(self, sess, inp=None):
     """Run inference."""
-    return sess.run(self.output, feed_dict={self.input: inp})
+    if inp is None:
+      feed_data = None
+    else:
+      feed_data = {self.input: inp}
+    return sess.run(self.output, feed_dict=feed_data)
+
+  def eval_step(self, sess, inp=None, label=None):
+    if inp is not None and label is not None:
+      feed_data = {self.input: inp, self.label: label}
+    elif inp is not None:
+      feed_data = {self.input: inp}
+    elif label is not None:
+      feed_data = {self.label: label}
+    else:
+      feed_data = None
+    return sess.run(self.correct)
+
+  def train_step(self, sess, inp=None, label=None):
+    """Run training."""
+    if inp is not None and label is not None:
+      feed_data = {self.input: inp, self.label: label}
+    elif inp is not None:
+      feed_data = {self.input: inp}
+    elif label is not None:
+      feed_data = {self.label: label}
+    else:
+      feed_data = None
+    results = sess.run([self.cross_ent, self.train_op] + self.bn_update_ops,
+                       feed_dict=feed_data)
+    return results[0]
+
+  @property
+  def cost(self):
+    return self._cost
+
+  @property
+  def train_op(self):
+    return self._train_op
+
+  @property
+  def bn_update_ops(self):
+    return self._bn_update_ops
+
+  @property
+  def config(self):
+    return self._config
+
+  @property
+  def lr(self):
+    return self._lr
+
+  @property
+  def dtype(self):
+    return self._dtype
+
+  @property
+  def input(self):
+    return self._input
+
+  @property
+  def output(self):
+    return self._output
+
+  @property
+  def correct(self):
+    return self._correct
+
+  @property
+  def label(self):
+    return self._label
+
+  @property
+  def cross_ent(self):
+    return self._cross_ent
+
+  @property
+  def global_step(self):
+    return self._global_step
+
+  @property
+  def grads_and_vars(self):
+    return self._grads_and_vars
+
+  @property
+  def dilated(self):
+    return self._dilated
+
+
+@RegisterModel("resnet")
+def get_resnet_model(config,
+                     is_training=True,
+                     inference_only=False,
+                     inp=None,
+                     label=None,
+                     batch_size=None,
+                     apply_grad=True,
+                     idx=0):
+  return ResNetModel(
+      config,
+      is_training=is_training,
+      inference_only=inference_only,
+      inp=inp,
+      label=label,
+      batch_size=batch_size,
+      apply_grad=apply_grad,
+      idx=idx)

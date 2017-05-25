@@ -151,7 +151,10 @@ class Logger(object):
     logstr = "{} {} {} {}".format(typstr_log, timestr, callerstr, message)
 
     print(printstr)
-    pass
+    if self.filename is not None:
+      with open(self.filename, "a") as f:
+        f.write(logstr)
+        f.write("\n")
 
   def log_wrapper(self, message, typ="info", verbose=None):
     if verbose is None:
@@ -160,20 +163,15 @@ class Logger(object):
     if type(verbose) != int:
       raise Exception("Unknown verbose value: {}".format(verbose))
 
-    log_lock.acquire()
-    try:
-      if self.verbose_thresh >= verbose:
+    if self.verbose_thresh >= verbose:
+      log_lock.acquire()
+      try:
         self.log(message, typ=typ, verbose=verbose)
-
-      if self.filename is not None:
-        with open(self.filename, "a") as f:
-          f.write(logstr)
-          f.write("\n")
-    except e:
-      print("Error occurred!!")
-      print(str(e))
-    finally:
-      log_lock.release()
+      except Exception as e:
+        print("Error occurred!!")
+        print(str(e))
+      finally:
+        log_lock.release()
 
   def info(self, message, verbose=None):
     """

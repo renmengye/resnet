@@ -6,7 +6,7 @@ Author: Mengye Ren (mren@cs.toronto.edu)
 Usage:
 ./run_imagenet_eval.py --id              [EXPERIMENT ID]     \
                        --logs            [LOGS FOLDER]       \
-                       --results         [SAVE FOLDER]       
+                       --results         [SAVE FOLDER]
 
 Flags:
   --id: Experiment ID, optional for new experiment.
@@ -22,28 +22,32 @@ import tensorflow as tf
 
 from tqdm import tqdm
 
-from resnet.configs.imagenet_exp_config import get_config, get_config_from_json
+from resnet.configs.config_factory import get_config_from_json
 from resnet.data import get_dataset
-from resnet.models import ResNetModel
+from resnet.models import get_model
 from resnet.utils import logger, ExperimentLogger
 
 flags = tf.flags
-flags.DEFINE_string("id", None, "eExperiment ID")
+flags.DEFINE_string("id", None, "Experiment ID")
 flags.DEFINE_string("results", "./results/imagenet", "Saving folder")
 flags.DEFINE_string("logs", "./logs/public", "Logging folder")
+flags.DEFINE_integer("ckpt_num", -1, "Checkpoint step number")
 FLAGS = tf.flags.FLAGS
 log = logger.get()
 
 
-def get_config():
+def _get_config():
   save_folder = os.path.join(FLAGS.results, FLAGS.id)
   return get_config_from_json(os.path.join(save_folder, "conf.json"))
 
 
-def get_model(config):
-  with tf.name_scope("Valid"):
-    with tf.variable_scope("Model"):
-      mvalid = ResNetModel(config, is_training=False)
+def _get_model(config):
+  with log.verbose_level(2):
+    with tf.name_scope("Valid"):
+      with tf.variable_scope("Model"):
+        log.info(config.name)
+        mvalid = get_model(
+            config.model_class, config, is_training=False, inference_only=True)
   return mvalid
 
 
@@ -55,13 +59,19 @@ def evaluate(sess, model, data_iter):
   for batch in iter_:
     y = model.infer_step(sess, batch["img"])
     pred_label = np.argmax(y, axis=1)
+    # print(np.concatenate(pred_label, batch["label"], axis=np.newaxis))
     num_correct += np.sum(np.equal(pred_label, batch["label"]).astype(float))
     count += pred_label.size
   acc = (num_correct / count)
   return acc
 
 
-def eval_model(config, train_data, test_data, save_folder, logs_folder=None):
+def eval_model(config,
+               train_data,
+               test_data,
+               save_folder,
+               logs_folder=None,
+               ckpt_num=-1):
   log.info("Config: {}".format(config.__dict__))
 
   with tf.Graph().as_default():
@@ -71,7 +81,7 @@ def eval_model(config, train_data, test_data, save_folder, logs_folder=None):
 
     # Builds models.
     log.info("Building models")
-    mvalid = get_model(config)
+    mvalid = _get_model(config)
 
     # # A hack to load compatible models.
     # variables = tf.global_variables()
@@ -84,8 +94,14 @@ def eval_model(config, train_data, test_data, save_folder, logs_folder=None):
     with tf.Session() as sess:
       # saver = tf.train.Saver(var_dict)
       saver = tf.train.Saver()
-      ckpt = tf.train.latest_checkpoint(save_folder)
-      # log.fatal(ckpt)
+      if ckpt_num == -1:
+        ckpt = tf.train.latest_checkpoint(save_folder)
+      elif ckpt_num >= 0:
+        ckpt = os.path.join(save_folder, "model.ckpt-{}".format(ckpt_num))
+      else:
+        raise ValueError("Invalid checkpoint number {}".format(ckpt_num))
+      if not os.path.exists(ckpt + ".meta"):
+        raise ValueError("Checkpoint not exists")
       saver.restore(sess, ckpt)
       train_acc = evaluate(sess, mvalid, train_data)
       val_acc = evaluate(sess, mvalid, test_data)
@@ -96,7 +112,7 @@ def eval_model(config, train_data, test_data, save_folder, logs_folder=None):
 
 
 def main():
-  config = get_config()
+  config = _get_config()
   exp_id = FLAGS.id
 
   save_folder = os.path.realpath(
@@ -119,6 +135,7 @@ def main():
       data_aug=False,
       batch_size=config.valid_batch_size,
       num_batches=100,
+      #num_batches=5,
       preprocessor=config.preprocessor)
   test_data = get_dataset(
       "imagenet",
@@ -126,10 +143,17 @@ def main():
       cycle=False,
       data_aug=False,
       batch_size=config.valid_batch_size,
+      #num_batches=5,
       preprocessor=config.preprocessor)
 
   # Evaluates a model.
-  eval_model(config, train_data, test_data, save_folder, logs_folder)
+  eval_model(
+      config,
+      train_data,
+      test_data,
+      save_folder,
+      logs_folder,
+      ckpt_num=FLAGS.ckpt_num)
 
 
 if __name__ == "__main__":

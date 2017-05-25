@@ -41,67 +41,71 @@ flags.DEFINE_string("machine", None, "Preferred machine")
 FLAGS = flags.FLAGS
 DATASET = "imagenet"
 
-# Get dispatcher factory.
-if FLAGS.local:
-  dispatch_factory = LocalCommandDispatcherFactory()
-else:
-  dispatch_factory = SlurmCommandDispatcherFactory("slurm_config.json")
-
-# Generate experiment ID.
-if FLAGS.id is None:
-  exp_id = gen_id("exp_" + DATASET + "_" + FLAGS.model)
-  restore = False
-  # raise Exception("You need to specify model ID.")
-else:
-  exp_id = FLAGS.id
-  restore = True
-
-save_folder = os.path.realpath(
-    os.path.abspath(os.path.join(FLAGS.results, exp_id)))
-
-while True:
-
-  # Check if we need to launch another job.
-  if os.path.exists(save_folder):
-    latest_ckpt = tf.train.latest_checkpoint(save_folder)
-    cur_steps = int(latest_ckpt.split("-")[-1])
+def main():
+  # Get dispatcher factory.
+  if FLAGS.local:
+    dispatch_factory = LocalCommandDispatcherFactory()
   else:
-    cur_steps = 0
-  if cur_steps >= FLAGS.max_max_steps:
-    log.info("Maximum steps {} reached.".format(FLAGS.max_max_steps))
-    break
+    dispatch_factory = SlurmCommandDispatcherFactory()
 
-  # Use slurm to launch job.
-  try:
-    start_time = time.time()
-    log.info("Training model \"{}\"".format(exp_id))
-    dispatcher = dispatch_factory.create(
-        num_gpu=4, num_cpu=12, machine=FLAGS.machine)
-    arg_list = [
-        "./run_imagenet_exp.py", "--id", exp_id, "--results", FLAGS.results,
-        "--logs", FLAGS.logs, "--max_num_steps", str(FLAGS.max_num_steps),
-        "--model", FLAGS.model, "--num_pass", str(FLAGS.num_pass), "--verbose",
-        "--num_gpu", "4"
-    ]
-    if restore:
-      arg_list.append("--restore")
-    restore = True  # Restore at the next time!
-    job = dispatcher.dispatch(arg_list)
-    code = job.wait()
-    if code != 0:
-      log.error("Job failed")
-  except Exception as e:
-    log.error("An exception occurred.")
-    log.error(e)
-    exc_type, exc_value, exc_traceback = sys.exc_info()
-    log.error("*** print_tb:")
-    traceback.print_tb(exc_traceback, limit=10, file=sys.stdout)
-    log.error("*** print_exception:")
-    traceback.print_exception(
-        exc_type, exc_value, exc_traceback, limit=10, file=sys.stdout)
+  # Generate experiment ID.
+  if FLAGS.id is None:
+    exp_id = gen_id("exp_" + DATASET + "_" + FLAGS.model)
+    restore = False
+    # raise Exception("You need to specify model ID.")
+  else:
+    exp_id = FLAGS.id
+    restore = True
 
-  # Wait for the next job.
-  end_time = time.time()
-  elapsed = end_time - start_time
-  if elapsed < FLAGS.min_interval:
-    time.sleep(FLAGS.min_interval - elapsed)
+  save_folder = os.path.realpath(
+      os.path.abspath(os.path.join(FLAGS.results, exp_id)))
+
+  while True:
+
+    # Check if we need to launch another job.
+    if os.path.exists(save_folder):
+      latest_ckpt = tf.train.latest_checkpoint(save_folder)
+      cur_steps = int(latest_ckpt.split("-")[-1])
+    else:
+      cur_steps = 0
+    if cur_steps >= FLAGS.max_max_steps:
+      log.info("Maximum steps {} reached.".format(FLAGS.max_max_steps))
+      break
+
+    # Use slurm to launch job.
+    try:
+      start_time = time.time()
+      log.info("Training model \"{}\"".format(exp_id))
+      dispatcher = dispatch_factory.create(
+          num_gpu=4, num_cpu=12, machine=FLAGS.machine)
+      arg_list = [
+          "./run_imagenet_exp.py", "--id", exp_id, "--results", FLAGS.results,
+          "--logs", FLAGS.logs, "--max_num_steps", str(FLAGS.max_num_steps),
+          "--model", FLAGS.model, "--num_pass", str(FLAGS.num_pass), "--verbose",
+          "--num_gpu", "4"
+      ]
+      if restore:
+        arg_list.append("--restore")
+      restore = True  # Restore at the next time!
+      job = dispatcher.dispatch(arg_list)
+      code = job.wait()
+      if code != 0:
+        log.error("Job failed")
+    except Exception as e:
+      log.error("An exception occurred.")
+      log.error(e)
+      exc_type, exc_value, exc_traceback = sys.exc_info()
+      log.error("*** print_tb:")
+      traceback.print_tb(exc_traceback, limit=10, file=sys.stdout)
+      log.error("*** print_exception:")
+      traceback.print_exception(
+          exc_type, exc_value, exc_traceback, limit=10, file=sys.stdout)
+
+    # Wait for the next job.
+    end_time = time.time()
+    elapsed = end_time - start_time
+    if elapsed < FLAGS.min_interval:
+      time.sleep(FLAGS.min_interval - elapsed)
+
+if __name__ == "__main__":
+  main()

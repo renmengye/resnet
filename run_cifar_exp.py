@@ -13,7 +13,7 @@ python run_cifar_exp.py    --model           [MODEL NAME]          \
                            --no_validation                         \
                            --logs            [LOGS FOLDER]         \
                            --results         [SAVE FOLDER]         \
-                           --gpu             [GPU ID]              
+                           --gpu             [GPU ID]
 
 Flags:
   --model: See resnet/configs/cifar_exp_config.py. Default resnet-32.
@@ -29,15 +29,16 @@ Flags:
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
+import json
 import numpy as np
 import os
 import tensorflow as tf
 
 from tqdm import tqdm
 
-from resnet.configs.cifar_exp_config import get_config, get_config_from_json
+from resnet.configs import get_config, get_config_from_json
 from resnet.data import get_dataset
-from resnet.models import ResNetModel
+from resnet.models import get_model
 from resnet.utils import ExperimentLogger, FixedLearnRateScheduler
 from resnet.utils import logger, gen_id
 
@@ -51,6 +52,7 @@ flags.DEFINE_string("results", "./results/cifar", "Saving folder.")
 flags.DEFINE_string("logs", "./logs/public", "Logging folder.")
 flags.DEFINE_string("model", "resnet-32", "Model type.")
 flags.DEFINE_bool("validation", False, "Whether run validation set.")
+flags.DEFINE_bool("restore", False, "Whether restore model.")
 FLAGS = flags.FLAGS
 
 
@@ -59,15 +61,39 @@ def _get_config():
   if FLAGS.config is not None:
     return get_config_from_json(FLAGS.config)
   else:
-    return get_config(FLAGS.dataset, FLAGS.model)
+    if FLAGS.restore:
+      save_folder = os.path.realpath(
+          os.path.abspath(os.path.join(FLAGS.results, FLAGS.id)))
+      return get_config_from_json(os.path.join(save_folder, "conf.json"))
+    else:
+      return get_config(FLAGS.dataset, FLAGS.model)
+
+
+def _get_models(config):
+  # Builds models.
+  log.info("Building models")
+  with tf.name_scope("Train"):
+    with tf.variable_scope("Model", reuse=None):
+      m = get_model(
+          config.model_class,
+          config,
+          is_training=True,
+          num_pass=1,
+          batch_size=config.batch_size)
+
+  with tf.name_scope("Valid"):
+    with tf.variable_scope("Model", reuse=True):
+      mvalid = get_model(
+          config.model_class,
+          config,
+          is_training=False,
+          batch_size=config.batch_size)
+  return m, mvalid
 
 
 def train_step(sess, model, batch):
   """Train step."""
-  feed_data = {model.input: batch["img"], model.label: batch["label"]}
-  cost, ce, _ = sess.run([model.cost, model.cross_ent, model.train_op],
-                         feed_dict=feed_data)
-  return ce
+  return model.train_step(sess, batch["img"], batch["label"])
 
 
 def evaluate(sess, model, data_iter):
@@ -75,8 +101,7 @@ def evaluate(sess, model, data_iter):
   num_correct = 0.0
   count = 0
   for batch in data_iter:
-    feed_data = {model.input: batch["img"]}
-    y = sess.run(model.output, feed_dict=feed_data)
+    y = model.infer_step(sess, batch["img"])
     pred_label = np.argmax(y, axis=1)
     num_correct += np.sum(np.equal(pred_label, batch["label"]).astype(float))
     count += pred_label.size
@@ -88,25 +113,12 @@ def save(sess, saver, global_step, config, save_folder):
   """Snapshots a model."""
   if not os.path.isdir(save_folder):
     os.makedirs(save_folder)
-    config_file = os.path.join(save_folder, "conf.json")
-    with open(config_file, "w") as f:
-      f.write(config.to_json())
+  config_file = os.path.join(save_folder, "conf.json")
+  with open(config_file, "w") as f:
+    f.write(json.dumps(dict(config.__dict__)))
   log.info("Saving to {}".format(save_folder))
   saver.save(
       sess, os.path.join(save_folder, "model.ckpt"), global_step=global_step)
-
-
-def get_models(config):
-  # Builds models.
-  log.info("Building models")
-  with tf.name_scope("Train"):
-    with tf.variable_scope("Model", reuse=None):
-      m = ResNetModel(config, is_training=True)
-
-  with tf.name_scope("Valid"):
-    with tf.variable_scope("Model", reuse=True):
-      mvalid = ResNetModel(config, is_training=False)
-  return m, mvalid
 
 
 def train_model(exp_id,
@@ -127,6 +139,8 @@ def train_model(exp_id,
   Returns:
       acc: Final test accuracy
   """
+  # log.info("Config: {}".format(config.__dict__))
+
   log.info("Config: {}".format(config.__dict__))
   exp_logger = ExperimentLogger(logs_folder)
 
@@ -139,11 +153,22 @@ def train_model(exp_id,
     else:
       log.info("Setting tensorflow random seed={:d}".format(config.seed))
       tf.set_random_seed(config.seed)
-    m, mvalid = get_models(config)
+    m, mvalid = _get_models(config)
 
     with tf.Session() as sess:
       saver = tf.train.Saver()
-      sess.run(tf.global_variables_initializer())
+      if FLAGS.restore:
+        log.info("Restore checkpoint \"{}\"".format(save_folder))
+        saver.restore(sess, tf.train.latest_checkpoint(save_folder))
+      else:
+        sess.run(tf.global_variables_initializer())
+      niter_start = int(m.global_step.eval())
+      w_list = tf.trainable_variables()
+      log.info("Model initialized.")
+      num_params = np.array([
+          np.prod(np.array([int(ss) for ss in w.get_shape()])) for w in w_list
+      ]).sum()
+      log.info("Number of parameters {}".format(num_params))
 
       # Set up learning rate schedule.
       if config.lr_scheduler_type == "fixed":
@@ -153,16 +178,11 @@ def train_model(exp_id,
             config.base_learn_rate,
             config.lr_decay_steps,
             lr_list=config.lr_list)
-      elif config.lr_scheduler_type == "exponential":
-        lr_scheduler = ExponentialLearnRateScheduler(
-            sess, m, config.base_learn_rate, config.lr_decay_offset,
-            config.max_train_iter, config.final_learn_rate,
-            config.lr_decay_interval)
       else:
         raise Exception("Unknown learning rate scheduler {}".format(
             config.lr_scheduler))
 
-      for niter in tqdm(range(config.max_train_iter), desc=exp_id):
+      for niter in tqdm(range(niter_start, config.max_train_iter), desc=exp_id):
         lr_scheduler.step(niter)
         ce = train_step(sess, m, train_iter.next())
 
@@ -183,7 +203,7 @@ def train_model(exp_id,
           exp_logger.log_learn_rate(niter, m.lr.eval())
 
       test_iter.reset()
-      acc = evaluate(test_iter, -1)
+      acc = evaluate(sess, mvalid, test_iter)
   return acc
 
 
@@ -200,10 +220,12 @@ def main():
     test_str = "test"
 
   if FLAGS.id is None:
-    exp_id = "exp_" + FLAGS.dataset + "_" + FLAGS.model
+    dataset_name = FLAGS.dataset
+    exp_id = "exp_" + dataset_name + "_" + FLAGS.model
     exp_id = gen_id(exp_id)
   else:
     exp_id = FLAGS.id
+    dataset_name = exp_id.split("_")[1]
 
   if FLAGS.results is not None:
     save_folder = os.path.realpath(
@@ -223,16 +245,16 @@ def main():
 
   # Configures dataset objects.
   log.info("Building dataset")
-  train_data = get_dataset(FLAGS.dataset, train_str)
+  train_data = get_dataset(dataset_name, train_str)
   trainval_data = get_dataset(
-      FLAGS.dataset,
+      dataset_name,
       train_str,
       num_batches=100,
       data_aug=False,
       cycle=False,
       prefetch=False)
   test_data = get_dataset(
-      FLAGS.dataset, test_str, data_aug=False, cycle=False, prefetch=False)
+      dataset_name, test_str, data_aug=False, cycle=False, prefetch=False)
 
   # Trains a model.
   acc = train_model(
