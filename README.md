@@ -7,12 +7,12 @@ Custom paths first in `setup.sh` (data folder, model save folder, etc.).
 git clone --recursive git://github.com/renmengye/resnet.git
 cd resnet
 ./setup.sh
+bazel build //resnet/experiments:all
 ```
 
 ## CIFAR-10/100
 ```bash
-bazel build :run_cifar_exp
-./bazel-bin/run_cifar_exp \
+./bazel-bin/resnet/experiments/run_cifar_exp \
   --dataset cifar-10 \
   --model resnet-32 \
   --data_folder ../data/cifar-10
@@ -21,14 +21,12 @@ bazel build :run_cifar_exp
 ## ImageNet
 ```
 # Run training.
-bazel build :run_imagenet_exp
-./bazel-bin/run_imagenet_exp \
+./bazel-bin/resnet/experiments/run_imagenet_exp \
   --model resnet-50 \
   --data_folder ../data/imagenet
 
 # Evaluate a trained model. Launch this on a separate GPU. 
-bazel build :run_imagenet_eval
-./bazel-bin/run_imagenet_eval \
+./bazel-bin/resnet/experiments/run_imagenet_eval \
   --data_folder ../data/imagenet \
   --id [EXPERIMENT ID]
 ```
