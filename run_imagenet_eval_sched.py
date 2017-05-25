@@ -43,8 +43,11 @@ while True:
   try:
     start_time = time.time()
     log.info("Evaluating model \"{}\"".format(FLAGS.id))
-    dispatcher = dispatch_factory.create(
-        num_gpu=1, num_cpu=2, machine=FLAGS.machine)
+    if FLAGS.local:
+      dispatcher = dispatch_factory.create()
+    else:
+      dispatcher = dispatch_factory.create(
+          num_gpu=1, num_cpu=2, machine=FLAGS.machine)
     job = dispatcher.dispatch([
         "./run_imagenet_eval.py", "--id", FLAGS.id, "--results", FLAGS.results,
         "--logs", FLAGS.logs

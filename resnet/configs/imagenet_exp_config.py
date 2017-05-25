@@ -51,7 +51,7 @@ class ResNet50Config(ResNet32Config):
     self.run_validation = False
     self.num_classes = 1000
     # self.batch_size = 4
-    self.batch_size = 100
+    self.batch_size = 256
     self.preprocessor = "vgg"
 
 
