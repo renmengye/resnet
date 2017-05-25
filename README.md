@@ -12,7 +12,7 @@ cd resnet
 ## CIFAR-10/100
 ```bash
 bazel build :run_cifar_exp
-./bazel-bin/run_cifar_exp.py \
+./bazel-bin/run_cifar_exp \
   --dataset cifar-10 \
   --model resnet-32 \
   --data_folder ../data/cifar-10
@@ -22,13 +22,13 @@ bazel build :run_cifar_exp
 ```
 # Run training.
 bazel build :run_imagenet_exp
-./bazel-bin/run_imagenet_exp.py \
+./bazel-bin/run_imagenet_exp \
   --model resnet-50 \
   --data_folder ../data/imagenet
 
 # Evaluate a trained model. Launch this on a separate GPU. 
 bazel build :run_imagenet_eval
-./bazel-bin/run_imagenet_eval.py \
+./bazel-bin/run_imagenet_eval \
   --data_folder ../data/imagenet \
   --id [EXPERIMENT ID]
 ```
