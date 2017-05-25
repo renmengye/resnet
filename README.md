@@ -11,15 +11,23 @@ cd resnet
 
 ## CIFAR-10/100
 ```bash
-./run_cifar_exp.py --dataset cifar-10 --model resnet-32
+bazel build :run_cifar_exp
+./bazel-bin/run_cifar_exp.py \
+--dataset cifar-10 \
+--model resnet-32 \
+--data_folder ../data/cifar-10
 ```
 
 ## ImageNet
 ```
 # Run training.
-./run_imagenet_exp.py --model resnet-50
+bazel build :run_imagenet_exp
+./bazel-bin/run_imagenet_exp.py \
+--model resnet-50 \
+--data_folder ../data/imagenet
 
 # Evaluate a trained model. Launch this on a separate GPU. 
+bazel build :run_imagenet_eval
 ./run_imagenet_eval.py --id [EXPERIMENT ID]
 ```
 
@@ -34,4 +42,4 @@ SSH into the slurm manager node first, and then launch jobs there.
 ```
 
 ## Provided Model Configs
-See `resnet/configs/cifar_exp_config.py` and `resnet/configs/imagenet_exp_config.py`
+See `resnet/configs/cifar_config.py` and `resnet/configs/imagenet_config.py`
