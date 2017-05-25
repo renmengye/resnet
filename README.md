@@ -42,4 +42,4 @@ SSH into the slurm manager node first, and then launch jobs there.
 ```
 
 ## Provided Model Configs
-See `resnet/configs/cifar_config.py` and `resnet/configs/imagenet_config.py`
+See `resnet/configs/cifar_configs.py` and `resnet/configs/imagenet_configs.py`
