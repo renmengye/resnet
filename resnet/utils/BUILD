@@ -34,6 +34,13 @@ py_library(
 )
 
 py_library(
+    name = "test_utils",
+    srcs = ["test_utils.py"],
+    deps = [":logger"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "utils",
     srcs = ["__init__.py"],
     deps = [":logger", ":experiment_logger", ":lr_schedule", ":batch_iter",

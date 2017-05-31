@@ -54,6 +54,19 @@ py_library(
     deps = [":nnlib", ":model_factory", "//resnet/utils:logger"],
 )
 
+py_test(
+    name = "resnet_model_tests",
+    srcs = ["resnet_model_tests.py"],
+    deps = [
+        "//resnet/utils:logger",
+        "//resnet/utils:test_utils",
+        "//resnet/configs:test_configs",
+        "//resnet/configs",
+        ":model_factory",
+        ":resnet_model",
+    ]
+)
+
 py_library(
     name = "resnet_model_gpu",
     srcs = ["resnet_model_gpu.py"],
