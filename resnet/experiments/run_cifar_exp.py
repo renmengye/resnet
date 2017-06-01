@@ -50,7 +50,7 @@ flags.DEFINE_string("dataset", "cifar-10", "Dataset name.")
 flags.DEFINE_string("id", None, "Experiment ID.")
 flags.DEFINE_string("results", "./results/cifar", "Saving folder.")
 flags.DEFINE_string("logs", "./logs/public", "Logging folder.")
-flags.DEFINE_string("model", "resnet-32-10", "Model type.")
+flags.DEFINE_string("model", "resnet-32", "Model type.")
 flags.DEFINE_bool("validation", False, "Whether run validation set.")
 flags.DEFINE_bool("restore", False, "Whether restore model.")
 FLAGS = flags.FLAGS

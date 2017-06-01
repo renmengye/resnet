@@ -43,8 +43,8 @@ py_library(
 py_library(
     name = "model_factory",
     srcs = ["model_factory.py"],
-    deps = [":multi_tower_model", ":multi_tower_model_nccl", 
-            ":multi_pass_model", 
+    deps = ["//resnet/utils:factory",
+            ":multi_tower_model", 
             ":multi_pass_model_v2"],
 )
 

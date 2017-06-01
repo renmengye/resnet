@@ -41,9 +41,16 @@ py_library(
 )
 
 py_library(
+    name = "factory",
+    srcs = ["factory.py"],
+    deps = [],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
     name = "utils",
     srcs = ["__init__.py"],
     deps = [":logger", ":experiment_logger", ":lr_schedule", ":batch_iter",
-            ":gen_id"],
+            ":gen_id", ":factory"],
     visibility = ["//visibility:public"],
 )

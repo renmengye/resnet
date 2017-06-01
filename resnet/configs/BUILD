@@ -1,7 +1,7 @@
 py_library(
     name = "config_factory",
     srcs = ["config_factory.py"],
-    deps = [],
+    deps = ["//resnet/utils:factory"],
 )
 
 py_library(
@@ -20,7 +20,7 @@ py_library(
 py_library(
     name = "imagenet_configs",
     srcs = ["imagenet_configs.py"],
-    deps = [],
+    deps = [":cifar_configs"],
 )
 
 py_library(

@@ -7,25 +7,23 @@ import tensorflow as tf
 from resnet.utils import logger
 from collections import namedtuple
 from resnet.models.multi_tower_model import MultiTowerModel
-if int(tf.__version__[0]) > 0:
-  from resnet.models.multi_tower_model_nccl import MultiTowerModelNCCL
-#from resnet.models.multi_tower_multi_sess_model import MultiTowerMultiSessModel
-from resnet.models.multi_pass_model import MultiPassModel
 from resnet.models.multi_pass_model_v2 import MultiPassModelV2
-#from resnet.models.multi_node_model import MultiNodeModel
+from resnet.utils.factory import Factory
 
 log = logger.get()
 
-MODEL_REGISTRY = {}
+#MODEL_REGISTRY = {}
+_factory = Factory()
 
 
 def RegisterModel(model_name):
   """Registers a configuration."""
+  return _factory.register(model_name)
 
-  def decorator(f):
-    MODEL_REGISTRY[model_name] = f
+  #def decorator(f):
+  #  MODEL_REGISTRY[model_name] = f
 
-  return decorator
+  #return decorator
 
 
 def get_model(model_name,
@@ -60,11 +58,13 @@ def get_model(model_name,
     batch_size = batch_size // num_pass // num_node
     log.info("Batch size is set to {}".format(batch_size), verbose=0)
 
-  if key not in MODEL_REGISTRY:
+  #if key not in MODEL_REGISTRY:
+  if not _factory.has(key):
     raise ValueError("Unknown model \"{}\"".format(key))
 
   def _get_model(*args, **kwargs):
-    return MODEL_REGISTRY[key](*args, **kwargs)
+    return _factory.create(key, *args, **kwargs)
+    #return MODEL_REGISTRY[key](*args, **kwargs)
 
   if num_pass > 1:
     return MultiPassModelV2(
@@ -77,7 +77,6 @@ def get_model(model_name,
         label=label)
   if num_node > 1:
     assert num_pass == 1, "Not supported"
-    assert False, "Not supported"
     return MultiNodeModel(
         config_copy,
         _get_model,
@@ -129,8 +128,9 @@ def get_multi_gpu_model(model_name,
       json.dumps(config_dict),
       object_hook=lambda d: namedtuple('X', d.keys())(*d.values()))
   key = model_name
-  if key in MODEL_REGISTRY:
-    model_cls = MODEL_REGISTRY[key]
+  #if key in MODEL_REGISTRY:
+  if _factory.has(key):
+    model_cls = _factory.get(key)
   else:
     raise ValueError("Unknown model \"{}\"".format(key))
   if batch_size is not None:
@@ -140,6 +140,7 @@ def get_multi_gpu_model(model_name,
 
   def _get_multi_tower_model(config, **kwargs):
     if use_nccl:
+      assert False, "Not supported."
       return MultiTowerModelNCCL(
           config, model_cls, num_replica=num_replica, **kwargs)
     else:
@@ -153,7 +154,6 @@ def get_multi_gpu_model(model_name,
       apply_grad = True
     if multi_session:
       assert not use_nccl, "Not supported."
-      assert False, "Not supported."
       return MultiTowerMultiSessModel(
           config,
           model_cls,

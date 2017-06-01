@@ -3,17 +3,20 @@ from __future__ import (absolute_import, division, print_function,
 
 import json
 from collections import namedtuple
+from resnet.utils.factory import Factory
 
-CONFIG_REGISTRY = {}
+_factory = Factory()
+#CONFIG_REGISTRY = {}
 
 
 def RegisterConfig(dataset_name, model_name):
   """Registers a configuration."""
+  
+  return _factory.register(dataset_name + "_" + model_name)
+  #def decorator(f):
+  #  CONFIG_REGISTRY[dataset_name + "_" + model_name] = f
 
-  def decorator(f):
-    CONFIG_REGISTRY[dataset_name + "_" + model_name] = f
-
-  return decorator
+  #return decorator
 
 
 def get_config(dataset_name, model_name):
@@ -23,8 +26,10 @@ def get_config(dataset_name, model_name):
     model_name: Name of the model.
   """
   key = dataset_name + "_" + model_name
-  if key in CONFIG_REGISTRY:
-    return CONFIG_REGISTRY[key]()
+  #if key in CONFIG_REGISTRY:
+  if _factory.has(key):
+    return _factory.create(key)
+    #return CONFIG_REGISTRY[key]()
   else:
     raise ValueError("Unknown model \"{}\"".format(key))
 
